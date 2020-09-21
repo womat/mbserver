@@ -2,24 +2,20 @@
 package mbserver
 
 import (
+	"fmt"
 	"io"
 	"net"
-
-	"github.com/goburrow/serial"
 )
 
 // Server is a Modbus slave with allocated memory for discrete inputs, coils, etc.
 type Server struct {
 	// Debug enables more verbose messaging.
-	Debug            bool
-	listeners        []net.Listener
-	ports            []serial.Port
-	requestChan      chan *Request
-	function         [256](func(*Server, Framer) ([]byte, *Exception))
-	DiscreteInputs   []byte
-	Coils            []byte
-	HoldingRegisters []uint16
-	InputRegisters   []uint16
+	Debug       bool
+	listeners   []net.Listener
+	ports       []io.ReadWriteCloser
+	requestChan chan *Request
+	function    [256](func(*Server, Framer) ([]byte, *Exception))
+	Devices     map[byte]Device
 }
 
 // Request contains the connection and Modbus frame.
@@ -28,15 +24,17 @@ type Request struct {
 	frame Framer
 }
 
+// Device contains the Registers of a Modbus Device.
+type Device struct {
+	DiscreteInputs   []byte
+	Coils            []byte
+	HoldingRegisters []uint16
+	InputRegisters   []uint16
+}
+
 // NewServer creates a new Modbus server (slave).
 func NewServer() *Server {
 	s := &Server{}
-
-	// Allocate Modbus memory maps.
-	s.DiscreteInputs = make([]byte, 65536)
-	s.Coils = make([]byte, 65536)
-	s.HoldingRegisters = make([]uint16, 65536)
-	s.InputRegisters = make([]uint16, 65536)
 
 	// Add default functions.
 	s.function[1] = ReadCoils
@@ -48,10 +46,43 @@ func NewServer() *Server {
 	s.function[15] = WriteMultipleCoils
 	s.function[16] = WriteHoldingRegisters
 
+	// Allocate Modbus memory maps.
+	s.Devices = map[byte]Device{}
+	s.NewDevice(1)
+
 	s.requestChan = make(chan *Request)
 	go s.handler()
 
 	return s
+}
+
+func (s *Server) NewDevice(id byte) error {
+	if id < idmin && id > idmax {
+		return fmt.Errorf("invalid modbus id %v", id)
+	}
+	if _, ok := s.Devices[id]; ok {
+		return fmt.Errorf("mbserver: device %v already exists", id)
+	}
+	s.Devices[id] = Device{
+		DiscreteInputs:   make([]byte, 65536),
+		Coils:            make([]byte, 65536),
+		HoldingRegisters: make([]uint16, 65536),
+		InputRegisters:   make([]uint16, 65536),
+	}
+
+	return nil
+}
+
+func (s *Server) RemoveDevice(id byte) error {
+	if id < idmin && id > idmax {
+		return fmt.Errorf("invalid modbus id %v", id)
+	}
+	if _, ok := s.Devices[id]; !ok {
+		return fmt.Errorf("mbserver: device %v doesn't exists", id)
+	}
+	// delete Modbus memory maps.
+	delete(s.Devices, id)
+	return nil
 }
 
 // RegisterFunctionHandler override the default behavior for a given Modbus function.

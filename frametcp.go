@@ -59,6 +59,11 @@ func (frame *TCPFrame) Bytes() []byte {
 	return bytes
 }
 
+// GetDevice returns the Modbus DeviceId.
+func (frame *TCPFrame) GetDevice() uint8 {
+	return frame.Device
+}
+
 // GetFunction returns the Modbus function code.
 func (frame *TCPFrame) GetFunction() uint8 {
 	return frame.Function
@@ -85,4 +90,27 @@ func (frame *TCPFrame) SetException(exception *Exception) {
 
 func (frame *TCPFrame) setLength() {
 	frame.Length = uint16(len(frame.Data) + 2)
+}
+
+func (frame TCPFrame) GetFrameParts() (register uint16, numRegs int, device uint8, exception *Exception, err error) {
+	data := frame.GetData()
+	start := int(binary.BigEndian.Uint16(data[0:2]))
+	numRegs = int(binary.BigEndian.Uint16(data[2:4]))
+	device = frame.Device
+
+	if end := start + numRegs; end > 65536 {
+		err = fmt.Errorf("mbmaster: illegal data address %v\n", end)
+		exception = &IllegalDataAddress
+		return
+	}
+
+	if device < idmin || device > idmax {
+		err = fmt.Errorf("mbmaster: invalid modbus id %v\n", device)
+		exception = &SlaveDeviceFailure
+		return
+	}
+
+	register = uint16(start)
+	exception = &Success
+	return
 }

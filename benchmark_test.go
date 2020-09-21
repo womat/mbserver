@@ -177,7 +177,7 @@ func Example() {
 	// results [0 3 0 4 0 5]
 }
 
-// Override the default ReadDiscreteInputs funtion.
+// Override the default ReadDiscreteInputs function.
 func ExampleServer_RegisterFunctionHandler() {
 	serv := NewServer()
 
@@ -195,7 +195,7 @@ func ExampleServer_RegisterFunctionHandler() {
 			}
 			data := make([]byte, 1+dataSize)
 			data[0] = byte(dataSize)
-			for i := range s.DiscreteInputs[register:endRegister] {
+			for i := range s.Devices[1].DiscreteInputs[register:endRegister] {
 				// Return all 1s, regardless of the value in the DiscreteInputs array.
 				shift := uint(i) % 8
 				data[1+i/8] |= byte(1 << shift)

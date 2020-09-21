@@ -1,25 +1,25 @@
 package mbserver
 
 import (
+	serial "github.com/womat/serialrtu"
 	"io"
 	"log"
-
-	"github.com/goburrow/serial"
 )
 
 // ListenRTU starts the Modbus server listening to a serial device.
 // For example:  err := s.ListenRTU(&serial.Config{Address: "/dev/ttyUSB0"})
-func (s *Server) ListenRTU(serialConfig *serial.Config) (err error) {
+func (s *Server) ListenRTU(serialConfig serial.Config) (err error) {
 	port, err := serial.Open(serialConfig)
+
 	if err != nil {
-		log.Fatalf("failed to open %s: %v\n", serialConfig.Address, err)
+		log.Fatalf("failed to open %s: %v\n", serialConfig.PortName, err)
 	}
 	s.ports = append(s.ports, port)
 	go s.acceptSerialRequests(port)
 	return err
 }
 
-func (s *Server) acceptSerialRequests(port serial.Port) {
+func (s *Server) acceptSerialRequests(port io.ReadWriteCloser) {
 	for {
 		buffer := make([]byte, 512)
 
@@ -28,7 +28,7 @@ func (s *Server) acceptSerialRequests(port serial.Port) {
 			if err != io.EOF {
 				log.Printf("serial read error %v\n", err)
 			}
-			return
+			continue
 		}
 
 		if bytesRead != 0 {
@@ -39,7 +39,7 @@ func (s *Server) acceptSerialRequests(port serial.Port) {
 			frame, err := NewRTUFrame(packet)
 			if err != nil {
 				log.Printf("bad serial frame error %v\n", err)
-				return
+				continue
 			}
 
 			request := &Request{port, frame}

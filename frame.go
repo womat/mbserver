@@ -1,15 +1,24 @@
 package mbserver
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+)
+
+const (
+	idmin = 1
+	idmax = 247
+)
 
 // Framer is the interface that wraps Modbus frames.
 type Framer interface {
 	Bytes() []byte
 	Copy() Framer
 	GetData() []byte
+	GetDevice() uint8
 	GetFunction() uint8
 	SetException(exception *Exception)
 	SetData(data []byte)
+	GetFrameParts() (register uint16, numRegs int, device uint8, exception *Exception, err error)
 }
 
 // GetException retunrns the Modbus exception or Success (indicating not exception).

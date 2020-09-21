@@ -1,10 +1,11 @@
-[![Build Status](https://travis-ci.org/tbrandon/mbserver.svg?branch=master)](https://travis-ci.org/tbrandon/mbserver)
-[![Coverage Status](http://codecov.io/github/tbrandon/mbserver/coverage.svg?branch=master)](http://codecov.io/github/tbrandon/mbserver?branch=master)
-[![GoDoc](https://godoc.org/github.com/tbrandon/mbserver?status.svg)](https://godoc.org/github.com/tbrandon/mbserver)
-[![Software License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/tbrandon/mbserver/blob/master/LICENSE)
-
 # Golang Modbus Server (Slave)
 
+This implementation is a fork of https://godoc.org/github.com/tbrandon/mbserver
+with additional functions:
+- support multiple Modbus Devices
+- Modbus RTU is working
+- communication errors doesn'nt stop the server process
+ 
 The Golang Modbus Server (Slave) responds to the following Modbus function requests:
 
 Bit access:
@@ -21,8 +22,11 @@ Bit access:
 
 TCP and serial RTU access is supported.
 
-The server internally allocates memory for 65536 coils, 65536 discrete inputs, 653356 holding registers and 65536 input registers.
-On start, all values are initialzied to zero.  Modbus requests are processed in the order they are received and will not overlap/interfere with each other.
+Multiple Device Devices are supported.
+
+The server internally allocates memory for 65536 coils, 65536 discrete inputs, 653356 holding registers and 65536 input registers for each Modbus Device.
+On start, Modbus Device 1 is initialized and all values are initialzied to zero. Additional Decices can be added.  
+Modbus requests are processed in the order they are received and will not overlap/interfere with each other.
 
 The golang [mbserver documentation](https://godoc.org/github.com/tbrandon/mbserver).
 
@@ -245,3 +249,4 @@ To check for race conditions, run:
 ```
 go test --race
 ```
+
