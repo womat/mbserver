@@ -40,6 +40,7 @@ func serverClientSetup() *serverClient {
 
 	// Client
 	setup.clientTCPHandler = modbus.NewTCPClientHandler(addr)
+	setup.clientTCPHandler.SlaveId = 1
 	// Connect manually so that multiple requests are handled in one connection session
 	setup.err = setup.clientTCPHandler.Connect()
 	if setup.err != nil {
@@ -158,12 +159,13 @@ func Example() {
 		return
 	}
 	defer handler.Close()
+	handler.SlaveId = 1
 	client := modbus.NewClient(handler)
 
 	// Write some registers.
 	_, err = client.WriteMultipleRegisters(0, 3, []byte{0, 3, 0, 4, 0, 5})
 	if err != nil {
-		log.Printf("%v\n", err)
+		log.Printf("wwwrite %v\n", err)
 	}
 
 	// Read those registers back.
@@ -222,10 +224,11 @@ func ExampleServer_RegisterFunctionHandler() {
 		return
 	}
 	defer handler.Close()
+	handler.SlaveId = 1
 	client := modbus.NewClient(handler)
 
 	// Read discrete inputs.
-	results, err := client.ReadDiscreteInputs(0, 16)
+	results, err := client.ReadDiscreteInputs(1, 16)
 	if err != nil {
 		log.Printf("%v\n", err)
 	}

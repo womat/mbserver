@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/goburrow/modbus"
-	"github.com/goburrow/serial"
+	"github.com/womat/framereader"
 )
 
 // The serial read and close has a known race condition.
@@ -31,7 +31,7 @@ func TestModbusRTU(t *testing.T) {
 
 	// Server
 	s := NewServer()
-	err = s.ListenRTU(&serial.Config{
+	err = s.ListenRTU(&framereader.Config{
 		Address:  "ttyFOO",
 		BaudRate: 115200,
 		DataBits: 8,

@@ -1,10 +1,9 @@
 package mbserver
 
 import (
+	"github.com/goburrow/modbus"
 	"testing"
 	"time"
-
-	"github.com/goburrow/modbus"
 )
 
 func TestAduRegisterAndNumber(t *testing.T) {
@@ -46,6 +45,7 @@ func TestUnsupportedFunction(t *testing.T) {
 func TestModbus(t *testing.T) {
 	// Server
 	s := NewServer()
+	s.NewDevice(100)
 	err := s.ListenTCP("127.0.0.1:3333")
 	if err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
@@ -64,6 +64,7 @@ func TestModbus(t *testing.T) {
 		t.FailNow()
 	}
 	defer handler.Close()
+	handler.SlaveId = 100
 	client := modbus.NewClient(handler)
 
 	// Coils
@@ -123,8 +124,8 @@ func TestModbus(t *testing.T) {
 	}
 
 	// Input registers
-	s.Devices[1].InputRegisters[65530] = 1
-	s.Devices[1].InputRegisters[65535] = 65535
+	s.Devices[100].InputRegisters[65530] = 1
+	s.Devices[100].InputRegisters[65535] = 65535
 	results, err = client.ReadInputRegisters(65530, 6)
 	if err != nil {
 		t.Errorf("expected nil, got %v\n", err)
