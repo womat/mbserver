@@ -14,7 +14,7 @@ type Server struct {
 	listeners   []net.Listener
 	ports       []io.ReadWriteCloser
 	requestChan chan *Request
-	function    [256](func(*Server, Framer) ([]byte, *Exception))
+	function    [256]func(*Server, Framer) ([]byte, *Exception)
 	Devices     map[byte]Device
 }
 
@@ -48,7 +48,7 @@ func NewServer() *Server {
 
 	// Allocate Modbus memory maps.
 	s.Devices = map[byte]Device{}
-	s.NewDevice(1)
+	_ = s.NewDevice(1)
 
 	s.requestChan = make(chan *Request)
 	go s.handler()
@@ -95,12 +95,13 @@ func (s *Server) handle(request *Request) Framer {
 	var data []byte
 
 	response := request.frame.Copy()
-
 	function := request.frame.GetFunction()
+
 	if s.function[function] != nil {
 		data, exception = s.function[function](s, request.frame)
 		response.SetData(data)
 	} else {
+		errorlog.Printf("IllegalFunction: %v\n", function)
 		exception = &IllegalFunction
 	}
 
@@ -115,8 +116,18 @@ func (s *Server) handle(request *Request) Framer {
 func (s *Server) handler() {
 	for {
 		request := <-s.requestChan
-		response := s.handle(request)
-		request.conn.Write(response.Bytes())
+		if request.frame.GetDevice() == 0 {
+			debuglog.Printf("start modbus broadcast")
+			for device, _ := range s.Devices {
+				request.frame.SetDevice(device)
+				response := s.handle(request)
+				request.conn.Write(response.Bytes())
+			}
+			debuglog.Printf("end modbus broadcast:")
+		} else {
+			response := s.handle(request)
+			request.conn.Write(response.Bytes())
+		}
 	}
 }
 

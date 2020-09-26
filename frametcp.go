@@ -64,6 +64,12 @@ func (frame *TCPFrame) GetDevice() uint8 {
 	return frame.Device
 }
 
+// SettDevice set the RTUFrame Modbus DeviceId.
+func (frame *TCPFrame) SetDevice(id uint8) {
+	frame.Device = id
+	return
+}
+
 // GetFunction returns the Modbus function code.
 func (frame *TCPFrame) GetFunction() uint8 {
 	return frame.Function

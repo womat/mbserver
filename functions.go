@@ -2,26 +2,25 @@ package mbserver
 
 import (
 	"encoding/binary"
-	"log"
+	"encoding/hex"
 )
-
-const InvalidDeviceId = "mbserver: invalid device id %v\n"
 
 // ReadCoils function 1, reads coils from internal memory.
 func ReadCoils(s *Server, frame Framer) ([]byte, *Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
 	device := frame.GetDevice()
-	if endRegister > 65535 {
+
+	if endRegister > 65536 {
+		errorlog.Printf("ReadCoils from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
 	}
-
+	// TODO: support of Broadcast (deviceId=0)
 	if _, ok := s.Devices[device]; !ok {
-		log.Printf(InvalidDeviceId, device)
+		errorlog.Printf("ReadCoils from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
 	}
 
-	// TODO: support of Broadcast (deviceId=0)
-	log.Printf("ReadCoils from Device %v, Address %v, quantity %v\n", device, register, numRegs)
+	debuglog.Printf("ReadCoils from Device %v, Address %v, quantity %v\n", device, register, numRegs)
 
 	dataSize := numRegs / 8
 	if (numRegs % 8) != 0 {
@@ -36,8 +35,7 @@ func ReadCoils(s *Server, frame Framer) ([]byte, *Exception) {
 		}
 	}
 
-	log.Printf("Response %v\n", data)
-
+	tracelog.Printf("Response %v\n", data)
 	return data, &Success
 }
 
@@ -46,16 +44,17 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, *Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
 	device := frame.GetDevice()
 
-	if endRegister > 65535 {
+	if endRegister > 65536 {
+		errorlog.Printf("ReadDiscreteInputs from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
 	}
+	// TODO: support of Broadcast (deviceId=0)
 	if _, ok := s.Devices[device]; !ok {
-		log.Printf(InvalidDeviceId, device)
+		errorlog.Printf("ReadDiscreteInputs from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
 	}
 
-	// TODO: support of Broadcast (deviceId=0)
-	log.Printf("ReadDiscreteInputs from Device %v, Address %v, quantity %v\n", device, register, numRegs)
+	debuglog.Printf("ReadDiscreteInputs from Device %v, Address %v, quantity %v\n", device, register, numRegs)
 
 	dataSize := numRegs / 8
 	if (numRegs % 8) != 0 {
@@ -70,8 +69,7 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, *Exception) {
 		}
 	}
 
-	log.Printf("Response %v\n", data)
-
+	tracelog.Printf("Response %v\n", data)
 	return data, &Success
 }
 
@@ -81,19 +79,19 @@ func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	device := frame.GetDevice()
 
 	if endRegister > 65536 {
+		errorlog.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
-	}
-	if _, ok := s.Devices[device]; !ok {
-		log.Printf(InvalidDeviceId, device)
-		return []byte{}, &SlaveDeviceFailure
 	}
 
 	// TODO: support of Broadcast (deviceId=0)
-	log.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v\n", device, register, numRegs)
+	if _, ok := s.Devices[device]; !ok {
+		errorlog.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
+		return []byte{}, &SlaveDeviceFailure
+	}
 
+	debuglog.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v\n", device, register, numRegs)
 	r := append([]byte{byte(numRegs * 2)}, Uint16ToBytes(s.Devices[device].HoldingRegisters[register:endRegister])...)
-	//	log.Printf("Response %v\n",hex.EncodeToString(r))
-
+	tracelog.Printf("Response %v\n", hex.EncodeToString(r))
 	return r, &Success
 }
 
@@ -103,19 +101,19 @@ func ReadInputRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	device := frame.GetDevice()
 
 	if endRegister > 65536 {
+		errorlog.Printf("ReadInputRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
 	}
+	// TODO: support of Broadcast (deviceId=0)
 	if _, ok := s.Devices[device]; !ok {
-		log.Printf(InvalidDeviceId, device)
+		errorlog.Printf("ReadInputRegisters from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
 	}
 
-	// TODO: support of Broadcast (deviceId=0)
-	log.Printf("ReadInputRegisters from Device %v, Address %v, quantity %v\n", device, register, numRegs)
+	debuglog.Printf("ReadInputRegisters from Device %v, Address %v, quantity %v\n", device, register, numRegs)
 
 	r := append([]byte{byte(numRegs * 2)}, Uint16ToBytes(s.Devices[device].InputRegisters[register:endRegister])...)
-	log.Printf("Response %v\n", r)
-
+	tracelog.Printf("Response %v\n", r)
 	return r, &Success
 }
 
@@ -124,24 +122,22 @@ func WriteSingleCoil(s *Server, frame Framer) ([]byte, *Exception) {
 	register, value := registerAddressAndValue(frame)
 	device := frame.GetDevice()
 
+	// TODO: support of Broadcast (deviceId=0)
 	if _, ok := s.Devices[device]; !ok {
-		log.Printf(InvalidDeviceId, device)
+		errorlog.Printf("WriteSingleCoil from Device %v, Address %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, device)
 		return []byte{}, &SlaveDeviceFailure
 	}
-
-	// TODO: support of Broadcast (deviceId=0)
 
 	// TODO Should we use 0 for off and 65,280 (FF00 in hexadecimal) for on?
 	if value != 0 {
 		value = 1
 	}
 
-	log.Printf("WriteSingleCoil to Device %v, Address %v, value %v\n", device, register, value)
+	debuglog.Printf("WriteSingleCoil to Device %v, Address %v, value %v\n", device, register, value)
 
 	s.Devices[device].Coils[register] = byte(value)
 	r := frame.GetData()[0:4]
-	log.Printf("Response %v\n", r)
-
+	tracelog.Printf("Response %v\n", r)
 	return r, &Success
 }
 
@@ -150,17 +146,17 @@ func WriteHoldingRegister(s *Server, frame Framer) ([]byte, *Exception) {
 	register, value := registerAddressAndValue(frame)
 	device := frame.GetDevice()
 
+	// TODO: support of Broadcast (deviceId=0)
 	if _, ok := s.Devices[device]; !ok {
-		log.Printf(InvalidDeviceId, device)
+		errorlog.Printf("WriteHoldingRegister from Device %v, Address %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, device)
 		return []byte{}, &SlaveDeviceFailure
 	}
-	// TODO: support of Broadcast (deviceId=0)
-	log.Printf("WriteHoldingRegister to Device %v, Address %v, value %v\n", device, register, value)
+
+	debuglog.Printf("WriteHoldingRegister to Device %v, Address %v, value %v\n", device, register, value)
 
 	s.Devices[device].HoldingRegisters[register] = value
 	r := frame.GetData()[0:4]
-	log.Printf("Response %v\n", r)
-
+	tracelog.Printf("Response %v\n", r)
 	return r, &Success
 }
 
@@ -172,15 +168,16 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, *Exception) {
 	valueBytes := frame.GetData()[5:]
 
 	if endRegister > 65536 {
+		errorlog.Printf("WriteMultipleCoils from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
 	}
+	// TODO: support of Broadcast (deviceId=0)
 	if _, ok := s.Devices[device]; !ok {
-		log.Printf(InvalidDeviceId, device)
+		errorlog.Printf("WriteMultipleCoils from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
 	}
 
-	// TODO: support of Broadcast (deviceId=0)
-	log.Printf("WriteMultipleCoils to Device %v, Address %v, values %v\n", device, register, valueBytes)
+	debuglog.Printf("WriteMultipleCoils to Device %v, Address %v, values %v\n", device, register, valueBytes)
 
 	// TODO This is not correct, bits and bytes do not always align
 	//if len(valueBytes)/2 != numRegs {
@@ -202,45 +199,41 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, *Exception) {
 	}
 
 	r := frame.GetData()[0:4]
-	log.Printf("Response %v\n", r)
-
+	tracelog.Printf("Response %v\n", r)
 	return r, &Success
 }
 
 // WriteHoldingRegisters function 16, writes holding registers to internal memory.
 func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
-	register, numRegs, _ := registerAddressAndNumber(frame)
+	register, numRegs, endRegister := registerAddressAndNumber(frame)
 	device := frame.GetDevice()
+	valueBytes := frame.GetData()[5:]
 
+	if endRegister > 65536 {
+		errorlog.Printf("WriteHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
+		return []byte{}, &IllegalDataAddress
+	}
+	if len(valueBytes)/2 != numRegs {
+		errorlog.Printf("WriteHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, len(valueBytes)/2 != numRegs : (%v != %v)\n", device, register, numRegs, len(valueBytes)/2, numRegs)
+		return []byte{}, &IllegalDataAddress
+	}
+
+	// TODO: support of Broadcast (deviceId=0)
 	if _, ok := s.Devices[device]; !ok {
-		log.Printf(InvalidDeviceId, device)
+		errorlog.Printf("WriteHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
 	}
-	// TODO: support of Broadcast (deviceId=0)
 
-	valueBytes := frame.GetData()[5:]
-	log.Printf("WriteMultipleCoils to Device %v, Address %v, values %v\n", device, register, valueBytes)
-
-	var exception *Exception
-	var data []byte
-
-	if len(valueBytes)/2 != numRegs {
-		exception = &IllegalDataAddress
-	}
-
+	debuglog.Printf("WriteHoldingRegisters to Device %v, Address %v, values %v\n", device, register, valueBytes)
 	// Copy data to memory
 	values := BytesToUint16(valueBytes)
-	valuesUpdated := copy(s.Devices[device].HoldingRegisters[register:], values)
-	if valuesUpdated == numRegs {
-		exception = &Success
-		data = frame.GetData()[0:4]
-	} else {
-		exception = &IllegalDataAddress
+	if valuesUpdated := copy(s.Devices[device].HoldingRegisters[register:], values); valuesUpdated != numRegs {
+		errorlog.Printf("WriteHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, valuesUpdated != numRegs: (%v != %v\n)", device, register, numRegs, valuesUpdated, numRegs)
+		return []byte{}, &IllegalDataAddress
 	}
 
-	log.Printf("Response %v\n", data)
-
-	return data, exception
+	tracelog.Printf("Response %v\n", frame.GetData()[0:4])
+	return frame.GetData()[0:4], &Success
 }
 
 // BytesToUint16 converts a big endian array of bytes to an array of unit16s
