@@ -81,7 +81,7 @@ type testsequenz = struct {
 var testSequenz testsequenz
 
 func TestListenRTU(t *testing.T) {
-	SetDebug(os.Stderr, Default)
+	SetDebug(os.Stderr, Full)
 	framereader.SetDebug(os.Stderr, framereader.Default)
 
 	testSequenz = testsequenz{sequenz: 0, frames: []testFrame{}}
@@ -173,7 +173,7 @@ func TestListenRTU(t *testing.T) {
 	serv.Devices[1].HoldingRegisters[2003] = 0x9900
 	serv.Devices[3].HoldingRegisters[1000] = 0x1234
 
-	_ = serv.ListenRTUNative(reader)
+	_ = serv.ListenRTU(reader)
 
 	time.Sleep(1 * time.Second)
 

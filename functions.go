@@ -34,7 +34,7 @@ func ReadCoils(s *Server, frame Framer) ([]byte, *Exception) {
 		}
 	}
 
-	tracelog.Printf("Response %v\n", data)
+	tracelog.Printf("response %v\n", hex.EncodeToString(data))
 	return data, &Success
 }
 
@@ -67,7 +67,7 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, *Exception) {
 		}
 	}
 
-	tracelog.Printf("Response %v\n", data)
+	tracelog.Printf("response %v\n", hex.EncodeToString(data))
 	return data, &Success
 }
 
@@ -88,7 +88,7 @@ func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 
 	debuglog.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v\n", device, register, numRegs)
 	r := append([]byte{byte(numRegs * 2)}, Uint16ToBytes(s.Devices[device].HoldingRegisters[register:endRegister])...)
-	tracelog.Printf("Response %v\n", hex.EncodeToString(r))
+	tracelog.Printf("response %v\n", hex.EncodeToString(r))
 	return r, &Success
 }
 
@@ -132,7 +132,7 @@ func WriteSingleCoil(s *Server, frame Framer) ([]byte, *Exception) {
 
 	s.Devices[device].Coils[register] = byte(value)
 	r := frame.GetData()[0:4]
-	tracelog.Printf("Response %v\n", r)
+	tracelog.Printf("response %v\n", hex.EncodeToString(r))
 	return r, &Success
 }
 
@@ -150,7 +150,7 @@ func WriteHoldingRegister(s *Server, frame Framer) ([]byte, *Exception) {
 
 	s.Devices[device].HoldingRegisters[register] = value
 	r := frame.GetData()[0:4]
-	tracelog.Printf("Response %v\n", r)
+	tracelog.Printf("response %v\n", hex.EncodeToString(r))
 	return r, &Success
 }
 
@@ -192,7 +192,7 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, *Exception) {
 	}
 
 	r := frame.GetData()[0:4]
-	tracelog.Printf("Response %v\n", r)
+	tracelog.Printf("response %v\n", hex.EncodeToString(r))
 	return r, &Success
 }
 
@@ -224,8 +224,9 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 		return []byte{}, &IllegalDataAddress
 	}
 
-	tracelog.Printf("Response %v\n", frame.GetData()[0:4])
-	return frame.GetData()[0:4], &Success
+	r := frame.GetData()[0:4]
+	tracelog.Printf("response %v\n", hex.EncodeToString(r))
+	return r, &Success
 }
 
 // BytesToUint16 converts a big endian array of bytes to an array of unit16s

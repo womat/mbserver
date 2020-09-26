@@ -2,6 +2,7 @@
 package mbserver
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -121,12 +122,16 @@ func (s *Server) handler() {
 			for device, _ := range s.Devices {
 				request.frame.SetDevice(device)
 				response := s.handle(request)
-				request.conn.Write(response.Bytes())
+				r := response.Bytes()
+				tracelog.Printf("write serial port: %v", hex.EncodeToString(r))
+				request.conn.Write(r)
 			}
 			debuglog.Printf("end modbus broadcast:")
 		} else {
 			response := s.handle(request)
-			request.conn.Write(response.Bytes())
+			r := response.Bytes()
+			tracelog.Printf("write serial port: %v", hex.EncodeToString(r))
+			request.conn.Write(r)
 		}
 	}
 }

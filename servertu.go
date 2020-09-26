@@ -2,27 +2,11 @@ package mbserver
 
 import (
 	"io"
-
-	"github.com/womat/framereader"
 )
 
 // ListenRTU starts the Modbus server listening to a serial device.
 // For example:  err := s.ListenRTU(&serial.Config{Address: "/dev/ttyUSB0"})
-func (s *Server) ListenRTU(serialConfig framereader.Config) (err error) {
-	port, err := framereader.Open(serialConfig)
-
-	if err != nil {
-		fatallog.Println("failed to open %s: %v\n", serialConfig.PortName, err)
-		return
-	}
-	s.ports = append(s.ports, port)
-	go s.acceptSerialRequests(port)
-	return err
-}
-
-// ListenRTU starts the Modbus server listening to a serial device.
-// For example:  err := s.ListenRTU(&serial.Config{Address: "/dev/ttyUSB0"})
-func (s *Server) ListenRTUNative(port io.ReadWriteCloser) (err error) {
+func (s *Server) ListenRTU(port io.ReadWriteCloser) (err error) {
 	s.ports = append(s.ports, port)
 	go s.acceptSerialRequests(port)
 	return err
