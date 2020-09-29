@@ -82,7 +82,7 @@ var testSequenz testsequenz
 
 func TestListenRTU(t *testing.T) {
 	SetDebug(os.Stderr, Full)
-	framereader.SetDebug(os.Stderr, framereader.Default)
+	framereader.SetDebug(os.Stderr, framereader.Debug)
 
 	testSequenz = testsequenz{sequenz: 0, frames: []testFrame{}}
 	rtuframe := RTUFrame{Address: 1, Function: 3}
