@@ -33,6 +33,7 @@ type Device struct {
 	InputRegisters   []uint16
 }
 
+// TODO Sollte auch nur New heißen
 // NewServer creates a new Modbus server (slave).
 func NewServer() *Server {
 	s := &Server{}
@@ -57,6 +58,8 @@ func NewServer() *Server {
 	return s
 }
 
+// TODO >> sollte einen Pointer zu den Registern zurückgeben
+// TODO Sollte auch nur New heißen
 func (s *Server) NewDevice(id byte) error {
 	if id < idmin && id > idmax {
 		return fmt.Errorf("invalid modbus id %v", id)
@@ -74,6 +77,7 @@ func (s *Server) NewDevice(id byte) error {
 	return nil
 }
 
+// TODO Sollte auch nur Close heißen
 func (s *Server) RemoveDevice(id byte) error {
 	if id < idmin && id > idmax {
 		return fmt.Errorf("invalid modbus id %v", id)
@@ -91,7 +95,7 @@ func (s *Server) RegisterFunctionHandler(funcCode uint8, function func(*Server, 
 	s.function[funcCode] = function
 }
 
-func (s *Server) handle(request *Request) (Framer, *Exception) {
+func (s *Server) handle(request *Request) Framer {
 	var exception *Exception
 	var data []byte
 
@@ -102,7 +106,7 @@ func (s *Server) handle(request *Request) (Framer, *Exception) {
 		data, exception = s.function[function](s, request.frame)
 		response.SetData(data)
 	} else {
-		errorlog.Printf("IllegalFunction: %v\n", function)
+		infolog.Printf("IllegalFunction: %v\n", function)
 		exception = &IllegalFunction
 	}
 
@@ -110,7 +114,7 @@ func (s *Server) handle(request *Request) (Framer, *Exception) {
 		response.SetException(exception)
 	}
 
-	return response, exception
+	return response
 }
 
 // All requests are handled synchronously to prevent modbus memory corruption.
@@ -122,7 +126,7 @@ func (s *Server) handler() {
 			debuglog.Printf("start modbus broadcast")
 			for device, _ := range s.Devices {
 				request.frame.SetDevice(device)
-				_, _ = s.handle(request)
+				_ = s.handle(request)
 				//  Broadcast doesn't send response
 			}
 			debuglog.Printf("end modbus broadcast:")
@@ -132,11 +136,12 @@ func (s *Server) handler() {
 				debuglog.Printf("unknown deviceid: %v\n", device)
 				return
 			}
-			if response, exception := s.handle(request); exception != &InternalError {
-				r := response.Bytes()
-				tracelog.Printf("write serial port: %v", hex.EncodeToString(r))
-				request.conn.Write(r)
-			}
+			//	if response, exception := s.handle(request); exception != &InternalError {
+			response := s.handle(request)
+			r := response.Bytes()
+			tracelog.Printf("write serial port: %v", hex.EncodeToString(r))
+			request.conn.Write(r)
+			//	}
 		}
 	}
 }

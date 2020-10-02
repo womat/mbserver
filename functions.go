@@ -11,13 +11,8 @@ func ReadCoils(s *Server, frame Framer) ([]byte, *Exception) {
 	device := frame.GetDevice()
 
 	if endRegister > 65536 {
-		errorlog.Printf("ReadCoils from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
+		infolog.Printf("ReadCoils from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
-	}
-	// TODO ignore request if unknown deviceid >> no response
-	if _, ok := s.Devices[device]; !ok {
-		errorlog.Printf("ReadCoils from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
-		return []byte{}, &SlaveDeviceFailure
 	}
 
 	debuglog.Printf("ReadCoils from Device %v, Address %v, quantity %v\n", device, register, numRegs)
@@ -45,13 +40,8 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, *Exception) {
 	device := frame.GetDevice()
 
 	if endRegister > 65536 {
-		errorlog.Printf("ReadDiscreteInputs from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
+		infolog.Printf("ReadDiscreteInputs from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
-	}
-	// TODO ignore request if unknown deviceid >> no response
-	if _, ok := s.Devices[device]; !ok {
-		errorlog.Printf("ReadDiscreteInputs from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
-		return []byte{}, &SlaveDeviceFailure
 	}
 
 	debuglog.Printf("ReadDiscreteInputs from Device %v, Address %v, quantity %v\n", device, register, numRegs)
@@ -79,13 +69,8 @@ func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	device := frame.GetDevice()
 
 	if endRegister > 65536 {
-		errorlog.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
+		infolog.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
-	}
-	// TODO ignore request if unknown deviceid >> no response
-	if _, ok := s.Devices[device]; !ok {
-		errorlog.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
-		return []byte{}, &SlaveDeviceFailure
 	}
 
 	debuglog.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v\n", device, register, numRegs)
@@ -100,13 +85,8 @@ func ReadInputRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	device := frame.GetDevice()
 
 	if endRegister > 65536 {
-		errorlog.Printf("ReadInputRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
+		infolog.Printf("ReadInputRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
-	}
-	// TODO ignore request if unknown deviceid >> no response
-	if _, ok := s.Devices[device]; !ok {
-		errorlog.Printf("ReadInputRegisters from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
-		return []byte{}, &SlaveDeviceFailure
 	}
 
 	debuglog.Printf("ReadInputRegisters from Device %v, Address %v, quantity %v\n", device, register, numRegs)
@@ -120,12 +100,6 @@ func ReadInputRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 func WriteSingleCoil(s *Server, frame Framer) ([]byte, *Exception) {
 	register, value := registerAddressAndValue(frame)
 	device := frame.GetDevice()
-
-	// TODO ignore request if unknown deviceid >> no response
-	if _, ok := s.Devices[device]; !ok {
-		errorlog.Printf("WriteSingleCoil from Device %v, Address %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, device)
-		return []byte{}, &SlaveDeviceFailure
-	}
 
 	// TODO Should we use 0 for off and 65,280 (FF00 in hexadecimal) for on?
 	if value != 0 {
@@ -145,12 +119,6 @@ func WriteHoldingRegister(s *Server, frame Framer) ([]byte, *Exception) {
 	register, value := registerAddressAndValue(frame)
 	device := frame.GetDevice()
 
-	// TODO ignore request if unknown deviceid >> no response
-	if _, ok := s.Devices[device]; !ok {
-		errorlog.Printf("WriteHoldingRegister from Device %v, Address %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, device)
-		return []byte{}, &SlaveDeviceFailure
-	}
-
 	debuglog.Printf("WriteHoldingRegister to Device %v, Address %v, value %v\n", device, register, value)
 
 	s.Devices[device].HoldingRegisters[register] = value
@@ -167,14 +135,8 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, *Exception) {
 	valueBytes := frame.GetData()[5:]
 
 	if endRegister > 65536 {
-		errorlog.Printf("WriteMultipleCoils from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
+		infolog.Printf("WriteMultipleCoils from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
-	}
-
-	// TODO ignore request if unknown deviceid >> no response
-	if _, ok := s.Devices[device]; !ok {
-		errorlog.Printf("WriteMultipleCoils from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
-		return []byte{}, &SlaveDeviceFailure
 	}
 
 	debuglog.Printf("WriteMultipleCoils to Device %v, Address %v, values %v\n", device, register, valueBytes)
@@ -210,18 +172,12 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 	valueBytes := frame.GetData()[5:]
 
 	if endRegister > 65536 {
-		errorlog.Printf("WriteHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
+		infolog.Printf("WriteHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
 	}
 	if len(valueBytes)/2 != numRegs {
 		errorlog.Printf("WriteHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, len(valueBytes)/2 != numRegs : (%v != %v)\n", device, register, numRegs, len(valueBytes)/2, numRegs)
 		return []byte{}, &IllegalDataAddress
-	}
-
-	// TODO ignore request if unknown deviceid >> no response
-	if _, ok := s.Devices[device]; !ok {
-		errorlog.Printf("WriteHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
-		return []byte{}, &SlaveDeviceFailure
 	}
 
 	debuglog.Printf("WriteHoldingRegisters to Device %v, Address %v, values %v\n", device, register, valueBytes)

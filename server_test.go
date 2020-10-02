@@ -1,7 +1,9 @@
 package mbserver
 
 import (
+	"fmt"
 	"github.com/goburrow/modbus"
+	"strings"
 	"testing"
 	"time"
 )
@@ -135,5 +137,126 @@ func TestModbus(t *testing.T) {
 	got = results
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v", expect, got)
+	}
+}
+
+func TestInvalidDeviceId(t *testing.T) {
+	const clients = 4
+
+	// Server
+	s := NewServer()
+	for i := byte(1); i <= clients; i++ {
+		s.NewDevice(i)
+	}
+	if err := s.ListenTCP("127.0.0.1:3333"); err != nil {
+		t.Fatalf("failed to listen, got %v\n", err)
+	}
+	defer s.Close()
+	// Allow the server to start and to avoid a connection refused on the client
+	time.Sleep(1 * time.Millisecond)
+
+	// Client
+	handler := modbus.NewTCPClientHandler("127.0.0.1:3333")
+	if err := handler.Connect(); err != nil {
+		t.Errorf("failed to connect, got %v\n", err)
+		t.FailNow()
+	}
+	defer handler.Close()
+	handler.SlaveId = clients + 1
+	handler.Timeout = time.Second
+	client := modbus.NewClient(handler)
+
+	// read results
+	_, err := client.ReadHoldingRegisters(1, 2)
+	got := fmt.Sprintf("%v", err)
+	expect := "127.0.0.1:3333: i/o timeout"
+	if !strings.Contains(got, expect) {
+		t.Errorf("expected %v, got %v", expect, got)
+	}
+}
+
+func TestBroadcastWrite(t *testing.T) {
+	const clients = 4
+	data := []byte{0, 3, 0, 4, 0, 5}
+
+	// Server
+	s := NewServer()
+	for i := byte(1); i <= clients; i++ {
+		s.NewDevice(i)
+	}
+	if err := s.ListenTCP("127.0.0.1:3333"); err != nil {
+		t.Fatalf("failed to listen, got %v\n", err)
+	}
+	defer s.Close()
+	// Allow the server to start and to avoid a connection refused on the client
+	time.Sleep(1 * time.Millisecond)
+
+	// Client
+	handler := modbus.NewTCPClientHandler("127.0.0.1:3333")
+	if err := handler.Connect(); err != nil {
+		t.Errorf("failed to connect, got %v\n", err)
+		t.FailNow()
+	}
+	defer handler.Close()
+	handler.SlaveId = 0
+	handler.Timeout = time.Second
+	client := modbus.NewClient(handler)
+
+	// send Broadcast
+	_, err := client.WriteMultipleRegisters(1, uint16(len(data))/2, data)
+	goterr := fmt.Sprintf("%v", err)
+	expecterr := "127.0.0.1:3333: i/o timeout"
+	if !strings.Contains(goterr, expecterr) {
+		t.Errorf("expected %v, got %v", expecterr, goterr)
+	}
+
+	// read results
+	expect := data
+
+	for c := byte(1); c <= 3; c++ {
+		handler.SlaveId = c
+		got, err := client.ReadHoldingRegisters(1, uint16(len(data))/2)
+		if err != nil {
+			t.Errorf("expected nil, got %v\n", err)
+			t.FailNow()
+		}
+		if !isEqual(expect, got) {
+			t.Errorf("expected %v, got %v", expect, got)
+		}
+	}
+}
+
+func TestBroadcastRead(t *testing.T) {
+	const clients = 4
+
+	// Server
+	s := NewServer()
+	for i := byte(1); i <= clients; i++ {
+		s.NewDevice(i)
+	}
+	if err := s.ListenTCP("127.0.0.1:3333"); err != nil {
+		t.Fatalf("failed to listen, got %v\n", err)
+	}
+	defer s.Close()
+	// Allow the server to start and to avoid a connection refused on the client
+	time.Sleep(1 * time.Millisecond)
+
+	// Client
+	handler := modbus.NewTCPClientHandler("127.0.0.1:3333")
+	if err := handler.Connect(); err != nil {
+		t.Errorf("failed to connect, got %v\n", err)
+		t.FailNow()
+	}
+	defer handler.Close()
+	handler.SlaveId = 0
+	handler.Timeout = time.Second
+	client := modbus.NewClient(handler)
+
+	// send Broadcast
+	_, err := client.ReadHoldingRegisters(1, 2)
+	goterr := fmt.Sprintf("%v", err)
+	expecterr := "127.0.0.1:3333: i/o timeout"
+	if !strings.Contains(goterr, expecterr) {
+		t.Errorf("expected %v, got %v", expecterr, goterr)
 	}
 }

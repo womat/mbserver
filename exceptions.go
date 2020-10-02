@@ -30,7 +30,7 @@ var (
 	// GatewayTargetDeviceFailedtoRespond Specialized for Modbus gateways. Sent when slave fails to respond.
 	GatewayTargetDeviceFailedtoRespond Exception = 11
 	// InternalError doesn't send a response
-	InternalError Exception = 255
+	// InternalError Exception = 255
 )
 
 func (e Exception) Error() string {
