@@ -5,6 +5,7 @@ import "fmt"
 // Exception codes.
 type Exception uint8
 
+// TODO replace var to const
 var (
 	// Success operation successful.
 	Success Exception
@@ -28,6 +29,8 @@ var (
 	GatewayPathUnavailable Exception = 10
 	// GatewayTargetDeviceFailedtoRespond Specialized for Modbus gateways. Sent when slave fails to respond.
 	GatewayTargetDeviceFailedtoRespond Exception = 11
+	// InternalError doesn't send a response
+	InternalError Exception = 255
 )
 
 func (e Exception) Error() string {

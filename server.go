@@ -91,7 +91,7 @@ func (s *Server) RegisterFunctionHandler(funcCode uint8, function func(*Server, 
 	s.function[funcCode] = function
 }
 
-func (s *Server) handle(request *Request) Framer {
+func (s *Server) handle(request *Request) (Framer, *Exception) {
 	var exception *Exception
 	var data []byte
 
@@ -110,28 +110,33 @@ func (s *Server) handle(request *Request) Framer {
 		response.SetException(exception)
 	}
 
-	return response
+	return response, exception
 }
 
 // All requests are handled synchronously to prevent modbus memory corruption.
 func (s *Server) handler() {
 	for {
 		request := <-s.requestChan
-		if request.frame.GetDevice() == 0 {
+		device := request.frame.GetDevice()
+		if device == 0 {
 			debuglog.Printf("start modbus broadcast")
 			for device, _ := range s.Devices {
 				request.frame.SetDevice(device)
-				response := s.handle(request)
+				_, _ = s.handle(request)
+				//  Broadcast doesn't send response
+			}
+			debuglog.Printf("end modbus broadcast:")
+		} else {
+			if _, ok := s.Devices[device]; !ok {
+				//  ignore request if  device is unknown
+				debuglog.Printf("unknown deviceid: %v\n", device)
+				return
+			}
+			if response, exception := s.handle(request); exception != &InternalError {
 				r := response.Bytes()
 				tracelog.Printf("write serial port: %v", hex.EncodeToString(r))
 				request.conn.Write(r)
 			}
-			debuglog.Printf("end modbus broadcast:")
-		} else {
-			response := s.handle(request)
-			r := response.Bytes()
-			tracelog.Printf("write serial port: %v", hex.EncodeToString(r))
-			request.conn.Write(r)
 		}
 	}
 }

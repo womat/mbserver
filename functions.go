@@ -14,6 +14,7 @@ func ReadCoils(s *Server, frame Framer) ([]byte, *Exception) {
 		errorlog.Printf("ReadCoils from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
 	}
+	// TODO ignore request if unknown deviceid >> no response
 	if _, ok := s.Devices[device]; !ok {
 		errorlog.Printf("ReadCoils from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
@@ -47,6 +48,7 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, *Exception) {
 		errorlog.Printf("ReadDiscreteInputs from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
 	}
+	// TODO ignore request if unknown deviceid >> no response
 	if _, ok := s.Devices[device]; !ok {
 		errorlog.Printf("ReadDiscreteInputs from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
@@ -80,7 +82,7 @@ func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 		errorlog.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
 	}
-
+	// TODO ignore request if unknown deviceid >> no response
 	if _, ok := s.Devices[device]; !ok {
 		errorlog.Printf("ReadHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
@@ -101,6 +103,7 @@ func ReadInputRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 		errorlog.Printf("ReadInputRegisters from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
 	}
+	// TODO ignore request if unknown deviceid >> no response
 	if _, ok := s.Devices[device]; !ok {
 		errorlog.Printf("ReadInputRegisters from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
@@ -118,6 +121,7 @@ func WriteSingleCoil(s *Server, frame Framer) ([]byte, *Exception) {
 	register, value := registerAddressAndValue(frame)
 	device := frame.GetDevice()
 
+	// TODO ignore request if unknown deviceid >> no response
 	if _, ok := s.Devices[device]; !ok {
 		errorlog.Printf("WriteSingleCoil from Device %v, Address %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, device)
 		return []byte{}, &SlaveDeviceFailure
@@ -141,6 +145,7 @@ func WriteHoldingRegister(s *Server, frame Framer) ([]byte, *Exception) {
 	register, value := registerAddressAndValue(frame)
 	device := frame.GetDevice()
 
+	// TODO ignore request if unknown deviceid >> no response
 	if _, ok := s.Devices[device]; !ok {
 		errorlog.Printf("WriteHoldingRegister from Device %v, Address %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, device)
 		return []byte{}, &SlaveDeviceFailure
@@ -165,6 +170,8 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, *Exception) {
 		errorlog.Printf("WriteMultipleCoils from Device %v, Address %v, quantity %v >> Exception: IllegalDataAddress, Registeraddress: %v\n", device, register, numRegs, endRegister)
 		return []byte{}, &IllegalDataAddress
 	}
+
+	// TODO ignore request if unknown deviceid >> no response
 	if _, ok := s.Devices[device]; !ok {
 		errorlog.Printf("WriteMultipleCoils from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
@@ -211,6 +218,7 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, *Exception) {
 		return []byte{}, &IllegalDataAddress
 	}
 
+	// TODO ignore request if unknown deviceid >> no response
 	if _, ok := s.Devices[device]; !ok {
 		errorlog.Printf("WriteHoldingRegisters from Device %v, Address %v, quantity %v >> Exception: SlaveDeviceFailure, Invalid DeviceId: %v\n", device, register, numRegs, device)
 		return []byte{}, &SlaveDeviceFailure
