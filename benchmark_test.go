@@ -185,11 +185,11 @@ func ExampleServer_RegisterFunctionHandler() {
 
 	// Override ReadDiscreteInputs function.
 	serv.RegisterFunctionHandler(2,
-		func(s *Server, frame Framer) ([]byte, *Exception) {
+		func(s *Server, frame Framer) ([]byte, Exception) {
 			register, numRegs, endRegister := registerAddressAndNumber(frame)
 			// Check the request is within the allocated memory
 			if endRegister > 65535 {
-				return []byte{}, &IllegalDataAddress
+				return []byte{}, IllegalDataAddress
 			}
 			dataSize := numRegs / 8
 			if (numRegs % 8) != 0 {
@@ -202,7 +202,7 @@ func ExampleServer_RegisterFunctionHandler() {
 				shift := uint(i) % 8
 				data[1+i/8] |= byte(1 << shift)
 			}
-			return data, &Success
+			return data, Success
 		})
 
 	// Start the server.

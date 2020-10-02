@@ -16,10 +16,10 @@ type Framer interface {
 	GetData() []byte
 	GetDevice() uint8
 	GetFunction() uint8
-	SetException(exception *Exception)
+	SetException(exception Exception)
 	SetData(data []byte)
 	SetDevice(id uint8)
-	GetFrameParts() (register uint16, numRegs int, device uint8, exception *Exception, err error)
+	GetFrameParts() (register uint16, numRegs int, device uint8, exception Exception, err error)
 }
 
 // GetException retunrns the Modbus exception or Success (indicating not exception).

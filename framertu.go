@@ -91,12 +91,12 @@ func (frame *RTUFrame) SetData(data []byte) {
 }
 
 // SetException sets the Modbus exception code in the frame.
-func (frame *RTUFrame) SetException(exception *Exception) {
+func (frame *RTUFrame) SetException(exception Exception) {
 	frame.Function = frame.Function | 0x80
-	frame.Data = []byte{byte(*exception)}
+	frame.Data = []byte{byte(exception)}
 }
 
-func (frame *RTUFrame) GetFrameParts() (register uint16, numRegs int, device uint8, exception *Exception, err error) {
+func (frame *RTUFrame) GetFrameParts() (register uint16, numRegs int, device uint8, exception Exception, err error) {
 	data := frame.GetData()
 	start := int(binary.BigEndian.Uint16(data[0:2]))
 	numRegs = int(binary.BigEndian.Uint16(data[2:4]))
@@ -104,17 +104,17 @@ func (frame *RTUFrame) GetFrameParts() (register uint16, numRegs int, device uin
 
 	if end := start + numRegs; end > 65536 {
 		err = fmt.Errorf("mbmaster: illegal data address %v\n", end)
-		exception = &IllegalDataAddress
+		exception = IllegalDataAddress
 		return
 	}
 
 	if device < idmin || device > idmax {
 		err = fmt.Errorf("mbmaster: invalid modbus id %v\n", device)
-		exception = &SlaveDeviceFailure
+		exception = SlaveDeviceFailure
 		return
 	}
 
 	register = uint16(start)
-	exception = &Success
+	exception = Success
 	return
 }

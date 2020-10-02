@@ -15,7 +15,7 @@ type Server struct {
 	listeners   []net.Listener
 	ports       []io.ReadWriteCloser
 	requestChan chan *Request
-	function    [256]func(*Server, Framer) ([]byte, *Exception)
+	function    [256]func(*Server, Framer) ([]byte, Exception)
 	Devices     map[byte]Device
 }
 
@@ -91,12 +91,12 @@ func (s *Server) RemoveDevice(id byte) error {
 }
 
 // RegisterFunctionHandler override the default behavior for a given Modbus function.
-func (s *Server) RegisterFunctionHandler(funcCode uint8, function func(*Server, Framer) ([]byte, *Exception)) {
+func (s *Server) RegisterFunctionHandler(funcCode uint8, function func(*Server, Framer) ([]byte, Exception)) {
 	s.function[funcCode] = function
 }
 
 func (s *Server) handle(request *Request) Framer {
-	var exception *Exception
+	var exception Exception
 	var data []byte
 
 	response := request.frame.Copy()
@@ -107,10 +107,10 @@ func (s *Server) handle(request *Request) Framer {
 		response.SetData(data)
 	} else {
 		infolog.Printf("IllegalFunction: %v\n", function)
-		exception = &IllegalFunction
+		exception = IllegalFunction
 	}
 
-	if exception != &Success {
+	if exception != Success {
 		response.SetException(exception)
 	}
 

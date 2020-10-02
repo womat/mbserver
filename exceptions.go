@@ -5,10 +5,9 @@ import "fmt"
 // Exception codes.
 type Exception uint8
 
-// TODO replace var to const
-var (
+const (
 	// Success operation successful.
-	Success Exception
+	Success Exception = 0
 	// IllegalFunction function code received in the query is not recognized or allowed by slave.
 	IllegalFunction Exception = 1
 	// IllegalDataAddress data address of some or all the required entities are not allowed or do not exist in slave.
@@ -29,8 +28,6 @@ var (
 	GatewayPathUnavailable Exception = 10
 	// GatewayTargetDeviceFailedtoRespond Specialized for Modbus gateways. Sent when slave fails to respond.
 	GatewayTargetDeviceFailedtoRespond Exception = 11
-	// InternalError doesn't send a response
-	// InternalError Exception = 255
 )
 
 func (e Exception) Error() string {
