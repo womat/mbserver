@@ -8,6 +8,42 @@ import (
 	"time"
 )
 
+func TestNewDevice(t *testing.T) {
+	const id = 2
+	s := NewServer()
+	defer s.Close()
+	if err := s.NewDevice(id); err != nil {
+		t.Fatalf("failed to create new device %v: %v\n", id, err)
+	}
+}
+
+func TestNewDevice0(t *testing.T) {
+	const id = 0
+	s := NewServer()
+	defer s.Close()
+	if err := s.NewDevice(id); err == nil {
+		t.Fatalf("create an unsupported device %v should not be allowed\n", id)
+	}
+}
+
+func TestNewDevice248(t *testing.T) {
+	const id = idmax + 1
+	s := NewServer()
+	defer s.Close()
+	if err := s.NewDevice(id); err == nil {
+		t.Fatalf("create an unsupported device %v should not be allowed\n", id)
+	}
+}
+
+func TestNewDeviceExists(t *testing.T) {
+	const id = 1
+	s := NewServer()
+	defer s.Close()
+	if err := s.NewDevice(id); err == nil {
+		t.Fatalf("create an existing device %v should not be allowed\n", id)
+	}
+}
+
 func TestAduRegisterAndNumber(t *testing.T) {
 	var frame TCPFrame
 	SetDataWithRegisterAndNumber(&frame, 0, 64)

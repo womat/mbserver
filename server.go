@@ -1,4 +1,4 @@
-// Package mbserver implments a Modbus server (slave).
+// Package mbserver implements a Modbus server (slave).
 package mbserver
 
 import (
@@ -61,7 +61,7 @@ func NewServer() *Server {
 // TODO >> sollte einen Pointer zu den Registern zurückgeben
 // TODO Sollte auch nur New heißen
 func (s *Server) NewDevice(id byte) error {
-	if id < idmin && id > idmax {
+	if id < idmin || id > idmax {
 		return fmt.Errorf("invalid modbus id %v", id)
 	}
 	if _, ok := s.Devices[id]; ok {

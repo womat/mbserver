@@ -16,7 +16,7 @@ func isEqual(a interface{}, b interface{}) bool {
 
 // Function 1
 func TestReadCoils(t *testing.T) {
-	const deviceid = 255
+	const deviceid = 247
 	s := NewServer()
 	s.NewDevice(deviceid)
 	// Set the coil values
@@ -52,7 +52,7 @@ func TestReadCoils(t *testing.T) {
 
 // Function 2
 func TestReadDiscreteInputs(t *testing.T) {
-	const deviceid = 255
+	const deviceid = 240
 
 	s := NewServer()
 	s.NewDevice(deviceid)
@@ -88,7 +88,7 @@ func TestReadDiscreteInputs(t *testing.T) {
 
 // Function 3
 func TestReadHoldingRegisters(t *testing.T) {
-	const deviceid = 255
+	const deviceid = 240
 	s := NewServer()
 	s.NewDevice(deviceid)
 
@@ -233,7 +233,7 @@ func TestWriteMultipleCoils(t *testing.T) {
 
 // Function 16
 func TestWriteHoldingRegisters(t *testing.T) {
-	const deviceid = 255
+	const deviceid = 211
 
 	s := NewServer()
 	s.NewDevice(deviceid)
