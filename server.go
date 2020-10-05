@@ -127,21 +127,19 @@ func (s *Server) handler() {
 			for device, _ := range s.Devices {
 				request.frame.SetDevice(device)
 				_ = s.handle(request)
-				//  Broadcast doesn't send response
+				//  Broadcast doesn't send response!!
 			}
 			debuglog.Printf("end modbus broadcast:")
 		} else {
 			if _, ok := s.Devices[device]; !ok {
-				//  ignore request if  device is unknown
+				//  ignore request if device is unknown
 				debuglog.Printf("unknown deviceid: %v\n", device)
-				return
+				continue
 			}
-			//	if response, exception := s.handle(request); exception != &InternalError {
 			response := s.handle(request)
 			r := response.Bytes()
 			tracelog.Printf("write serial port: %v", hex.EncodeToString(r))
 			request.conn.Write(r)
-			//	}
 		}
 	}
 }
