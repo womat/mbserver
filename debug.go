@@ -2,7 +2,6 @@ package mbserver
 
 import (
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 )
@@ -86,12 +85,12 @@ func init() {
 }
 
 func SetDebug(w io.Writer, flag int) {
-	warningHandle := ioutil.Discard
-	infoHandle := ioutil.Discard
-	errorHandle := ioutil.Discard
-	debugHandle := ioutil.Discard
-	traceHandle := ioutil.Discard
-	fatalHandle := ioutil.Discard
+	warningHandle := io.Discard
+	infoHandle := io.Discard
+	errorHandle := io.Discard
+	debugHandle := io.Discard
+	traceHandle := io.Discard
+	fatalHandle := io.Discard
 
 	if flag&Info != 0 {
 		warningHandle = w
