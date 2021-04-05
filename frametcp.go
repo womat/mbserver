@@ -26,8 +26,8 @@ func NewTCPFrame(packet []byte) (*TCPFrame, error) {
 		TransactionIdentifier: binary.BigEndian.Uint16(packet[0:2]),
 		ProtocolIdentifier:    binary.BigEndian.Uint16(packet[2:4]),
 		Length:                binary.BigEndian.Uint16(packet[4:6]),
-		Device:                uint8(packet[6]),
-		Function:              uint8(packet[7]),
+		Device:                packet[6],
+		Function:              packet[7],
 		Data:                  packet[8:],
 	}
 
@@ -41,8 +41,8 @@ func NewTCPFrame(packet []byte) (*TCPFrame, error) {
 
 // Copy the TCPFrame.
 func (frame *TCPFrame) Copy() Framer {
-	copy := *frame
-	return &copy
+	c := *frame
+	return &c
 }
 
 // Bytes returns the Modbus byte stream based on the TCPFrame fields
@@ -67,7 +67,6 @@ func (frame *TCPFrame) GetDevice() uint8 {
 // SettDevice set the RTUFrame Modbus DeviceId.
 func (frame *TCPFrame) SetDevice(id uint8) {
 	frame.Device = id
-	return
 }
 
 // GetFunction returns the Modbus function code.
@@ -89,7 +88,7 @@ func (frame *TCPFrame) SetData(data []byte) {
 
 // SetException sets the Modbus exception code in the frame.
 func (frame *TCPFrame) SetException(exception Exception) {
-	frame.Function = frame.Function | 0x80
+	frame.Function |= 0x80
 	frame.Data = []byte{byte(exception)}
 	frame.setLength()
 }
@@ -105,13 +104,13 @@ func (frame TCPFrame) GetFrameParts() (register uint16, numRegs int, device uint
 	device = frame.Device
 
 	if end := start + numRegs; end > 65536 {
-		err = fmt.Errorf("mbmaster: illegal data address %v\n", end)
+		err = fmt.Errorf("mbmaster: illegal data address %v", end)
 		exception = IllegalDataAddress
 		return
 	}
 
-	if device < idmin || device > idmax {
-		err = fmt.Errorf("mbmaster: invalid modbus id %v\n", device)
+	if device < idMin || device > idMax {
+		err = fmt.Errorf("mbmaster: invalid modbus id %v", device)
 		exception = SlaveDeviceFailure
 		return
 	}

@@ -53,7 +53,7 @@ func serverClientSetup() *serverClient {
 }
 
 func (setup *serverClient) Close() {
-	setup.clientTCPHandler.Close()
+	_ = setup.clientTCPHandler.Close()
 	setup.slave.Close()
 }
 

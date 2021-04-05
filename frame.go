@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	idmin = 1
-	idmax = 247
+	idMin = 1
+	idMax = 247
 )
 
 // Framer is the interface that wraps Modbus frames.
@@ -22,7 +22,7 @@ type Framer interface {
 	GetFrameParts() (register uint16, numRegs int, device uint8, exception Exception, err error)
 }
 
-// GetException retunrns the Modbus exception or Success (indicating not exception).
+// GetException returns the Modbus exception or Success (indicating not exception).
 func GetException(frame Framer) (exception Exception) {
 	function := frame.GetFunction()
 	if (function & 0x80) != 0 {

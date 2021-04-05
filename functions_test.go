@@ -8,17 +8,15 @@ import (
 func isEqual(a interface{}, b interface{}) bool {
 	expect, _ := json.Marshal(a)
 	got, _ := json.Marshal(b)
-	if string(expect) != string(got) {
-		return false
-	}
-	return true
+
+	return string(expect) == string(got)
 }
 
 // Function 1
 func TestReadCoils(t *testing.T) {
 	const deviceid = 247
 	s := NewServer()
-	s.NewDevice(deviceid)
+	_ = s.NewDevice(deviceid)
 	// Set the coil values
 	s.Devices[deviceid].Coils[10] = 1
 	s.Devices[deviceid].Coils[11] = 1
@@ -55,7 +53,7 @@ func TestReadDiscreteInputs(t *testing.T) {
 	const deviceid = 240
 
 	s := NewServer()
-	s.NewDevice(deviceid)
+	_ = s.NewDevice(deviceid)
 	// Set the discrete input values
 	s.Devices[deviceid].DiscreteInputs[0] = 1
 	s.Devices[deviceid].DiscreteInputs[7] = 1
@@ -90,7 +88,7 @@ func TestReadDiscreteInputs(t *testing.T) {
 func TestReadHoldingRegisters(t *testing.T) {
 	const deviceid = 240
 	s := NewServer()
-	s.NewDevice(deviceid)
+	_ = s.NewDevice(deviceid)
 
 	s.Devices[deviceid].HoldingRegisters[100] = 1
 	s.Devices[deviceid].HoldingRegisters[101] = 2
@@ -236,7 +234,7 @@ func TestWriteHoldingRegisters(t *testing.T) {
 	const deviceid = 211
 
 	s := NewServer()
-	s.NewDevice(deviceid)
+	_ = s.NewDevice(deviceid)
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
 	frame.ProtocolIdentifier = 0

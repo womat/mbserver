@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+
+	"github.com/womat/debug"
 )
 
 // Server is a Modbus slave with allocated memory for discrete inputs, coils, etc.
@@ -33,7 +35,7 @@ type Device struct {
 	InputRegisters   []uint16
 }
 
-// TODO Sollte auch nur New heißen
+// TODO Should be called New
 // NewServer creates a new Modbus server (slave).
 func NewServer() *Server {
 	s := &Server{}
@@ -58,10 +60,10 @@ func NewServer() *Server {
 	return s
 }
 
-// TODO >> sollte einen Pointer zu den Registern zurückgeben
-// TODO Sollte auch nur New heißen
+// TODO >> should return a pointer to the registers
+// TODO Should be called New
 func (s *Server) NewDevice(id byte) error {
-	if id < idmin || id > idmax {
+	if id < idMin || id > idMax {
 		return fmt.Errorf("invalid modbus id %v", id)
 	}
 	if _, ok := s.Devices[id]; ok {
@@ -77,9 +79,9 @@ func (s *Server) NewDevice(id byte) error {
 	return nil
 }
 
-// TODO Sollte auch nur Close heißen
+// TODO should be called Close
 func (s *Server) RemoveDevice(id byte) error {
-	if id < idmin && id > idmax {
+	if id < idMin || id > idMax {
 		return fmt.Errorf("invalid modbus id %v", id)
 	}
 	if _, ok := s.Devices[id]; !ok {
@@ -106,7 +108,7 @@ func (s *Server) handle(request *Request) Framer {
 		data, exception = s.function[function](s, request.frame)
 		response.SetData(data)
 	} else {
-		infolog.Printf("IllegalFunction: %v\n", function)
+		debug.InfoLog.Printf("IllegalFunction: %v", function)
 		exception = IllegalFunction
 	}
 
@@ -123,23 +125,23 @@ func (s *Server) handler() {
 		request := <-s.requestChan
 		device := request.frame.GetDevice()
 		if device == 0 {
-			debuglog.Printf("start modbus broadcast")
-			for device, _ := range s.Devices {
+			debug.DebugLog.Printf("start modbus broadcast")
+			for device := range s.Devices {
 				request.frame.SetDevice(device)
 				_ = s.handle(request)
 				//  Broadcast doesn't send response!!
 			}
-			debuglog.Printf("end modbus broadcast:")
+			debug.DebugLog.Printf("end modbus broadcast:")
 		} else {
 			if _, ok := s.Devices[device]; !ok {
 				//  ignore request if device is unknown
-				debuglog.Printf("unknown deviceid: %v\n", device)
+				debug.DebugLog.Printf("unknown deviceid: %v", device)
 				continue
 			}
 			response := s.handle(request)
 			r := response.Bytes()
-			tracelog.Printf("write serial port: %v", hex.EncodeToString(r))
-			request.conn.Write(r)
+			debug.TraceLog.Printf("write serial port: %v", hex.EncodeToString(r))
+			_, _ = request.conn.Write(r)
 		}
 	}
 }
@@ -147,9 +149,9 @@ func (s *Server) handler() {
 // Close stops listening to TCP/IP ports and closes serial ports.
 func (s *Server) Close() {
 	for _, listen := range s.listeners {
-		listen.Close()
+		_ = listen.Close()
 	}
 	for _, port := range s.ports {
-		port.Close()
+		_ = port.Close()
 	}
 }

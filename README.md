@@ -4,7 +4,7 @@ This implementation is a fork of https://godoc.org/github.com/tbrandon/mbserver
 with additional functions:
 - support multiple Modbus Devices
 - Modbus RTU is working
-- communication errors doesn'nt stop the server process
+- communication errors doesn't stop the server process
  
 The Golang Modbus Server (Slave) responds to the following Modbus function requests:
 
@@ -14,7 +14,7 @@ Bit access:
 - Write Single Coil
 - Write Multiple Coils
 
-16-bit acess:
+16-bit access:
 - Read Input Registers
 - Read Multiple Holding Registers
 - Write Single Holding Register
@@ -25,7 +25,7 @@ TCP and serial RTU access is supported.
 Multiple Device Devices are supported.
 
 The server internally allocates memory for 65536 coils, 65536 discrete inputs, 653356 holding registers and 65536 input registers for each Modbus Device.
-On start, Modbus Device 1 is initialized and all values are initialzied to zero. Additional Decices can be added.  
+On start, Modbus Device 1 is initialized and all values are initialized to zero. Additional Devices can be added.  
 Modbus requests are processed in the order they are received and will not overlap/interfere with each other.
 
 The golang [mbserver documentation](https://godoc.org/github.com/tbrandon/mbserver).
@@ -62,7 +62,7 @@ The server will continue to listen until killed (&lt;ctrl>-c).
 Modbus typically uses port 502 (standard users require special permissions to listen on port 502). Change the port number as required.
 Change the address to 0.0.0.0 to listen on all network interfaces.
 
-An example of a client writing and reading holding regsiters:
+An example of a client writing and reading holding registers:
 ```
 package main
 
@@ -155,7 +155,7 @@ Information on [serial port settings](https://godoc.org/github.com/goburrow/seri
 func (s *Server) RegisterFunctionHandler(funcCode uint8, function func(*Server, Framer) ([]byte, *Exception))
  ```
 
-Example of overriding the default ReadDiscreteInputs funtion:
+Example of overriding the default ReadDiscreteInputs function:
 
 ```
 serv := NewServer()
@@ -219,7 +219,7 @@ results [255 255]
 
 ## Benchmarks
 
-Quanitify server read/write performance.  Benchmarks are for Modbus TCP operations.
+Quantify server read/write performance.  Benchmarks are for Modbus TCP operations.
 
 Run benchmarks:
 ```
@@ -234,7 +234,7 @@ PASS
 Operations per second are higher when requests are not forced to be  synchronously processed.
 In the case of simultaneous client access, synchronous Modbus request processing prevents data corruption.
 
-To understand performanc limitations, create a CPU profile graph for the WriteMultipleCoils benchmark:
+To understand performance limitations, create a CPU profile graph for the WriteMultipleCoils benchmark:
 ```
 go test -bench=.MultipleCoils -cpuprofile=cpu.out
 go tool pprof modbus-server.test cpu.out

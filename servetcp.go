@@ -1,10 +1,13 @@
 package mbserver
 
 import (
+	"errors"
 	"io"
 	"net"
 	"strings"
-)
+
+	"github.com/womat/debug"
+	)
 
 func (s *Server) accept(listen net.Listener) error {
 	for {
@@ -13,7 +16,7 @@ func (s *Server) accept(listen net.Listener) error {
 			if strings.Contains(err.Error(), "use of closed network connection") {
 				return nil
 			}
-			warninglog.Printf("Unable to accept connections: %#v\n", err)
+			debug.WarningLog.Printf("Unable to accept connections: %#v", err)
 			return err
 		}
 
@@ -24,8 +27,8 @@ func (s *Server) accept(listen net.Listener) error {
 				packet := make([]byte, 512)
 				bytesRead, err := conn.Read(packet)
 				if err != nil {
-					if err != io.EOF {
-						warninglog.Printf("read error %v\n", err)
+					if !errors.Is(err, io.EOF) {
+						debug.WarningLog.Printf("read error %v", err)
 					}
 					return
 				}
@@ -34,7 +37,7 @@ func (s *Server) accept(listen net.Listener) error {
 
 				frame, err := NewTCPFrame(packet)
 				if err != nil {
-					warninglog.Printf("bad packet error %v\n", err)
+					debug.WarningLog.Printf("bad packet error %v", err)
 					return
 				}
 
@@ -50,7 +53,7 @@ func (s *Server) accept(listen net.Listener) error {
 func (s *Server) ListenTCP(addressPort string) (err error) {
 	listen, err := net.Listen("tcp", addressPort)
 	if err != nil {
-		errorlog.Printf("Failed to Listen: %v\n", err)
+		debug.ErrorLog.Printf("Failed to Listen: %v", err)
 		return err
 	}
 	s.listeners = append(s.listeners, listen)

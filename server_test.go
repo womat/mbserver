@@ -27,7 +27,7 @@ func TestNewDevice0(t *testing.T) {
 }
 
 func TestNewDevice248(t *testing.T) {
-	const id = idmax + 1
+	const id = idMax + 1
 	s := NewServer()
 	defer s.Close()
 	if err := s.NewDevice(id); err == nil {
@@ -83,7 +83,7 @@ func TestUnsupportedFunction(t *testing.T) {
 func TestModbus(t *testing.T) {
 	// Server
 	s := NewServer()
-	s.NewDevice(100)
+	_ = s.NewDevice(100)
 	err := s.ListenTCP("127.0.0.1:3333")
 	if err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
@@ -106,13 +106,13 @@ func TestModbus(t *testing.T) {
 	client := modbus.NewClient(handler)
 
 	// Coils
-	results, err := client.WriteMultipleCoils(100, 9, []byte{255, 1})
+	_, err = client.WriteMultipleCoils(100, 9, []byte{255, 1})
 	if err != nil {
 		t.Errorf("expected nil, got %v\n", err)
 		t.FailNow()
 	}
 
-	results, err = client.ReadCoils(100, 16)
+	results, err := client.ReadCoils(100, 16)
 	if err != nil {
 		t.Errorf("expected nil, got %v\n", err)
 		t.FailNow()
@@ -182,7 +182,7 @@ func TestInvalidDeviceId(t *testing.T) {
 	// Server
 	s := NewServer()
 	for i := byte(1); i <= clients; i++ {
-		s.NewDevice(i)
+		_ = s.NewDevice(i)
 	}
 	if err := s.ListenTCP("127.0.0.1:3333"); err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
@@ -218,7 +218,7 @@ func TestBroadcastWrite(t *testing.T) {
 	// Server
 	s := NewServer()
 	for i := byte(1); i <= clients; i++ {
-		s.NewDevice(i)
+		_ = s.NewDevice(i)
 	}
 	if err := s.ListenTCP("127.0.0.1:3333"); err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
@@ -240,10 +240,10 @@ func TestBroadcastWrite(t *testing.T) {
 
 	// send Broadcast
 	_, err := client.WriteMultipleRegisters(1, uint16(len(data))/2, data)
-	goterr := fmt.Sprintf("%v", err)
-	expecterr := "127.0.0.1:3333: i/o timeout"
-	if !strings.Contains(goterr, expecterr) {
-		t.Errorf("expected %v, got %v", expecterr, goterr)
+	gotErr := fmt.Sprintf("%v", err)
+	expectErr := "127.0.0.1:3333: i/o timeout"
+	if !strings.Contains(gotErr, expectErr) {
+		t.Errorf("expected %v, got %v", expectErr, gotErr)
 	}
 
 	// read results
@@ -268,7 +268,7 @@ func TestBroadcastRead(t *testing.T) {
 	// Server
 	s := NewServer()
 	for i := byte(1); i <= clients; i++ {
-		s.NewDevice(i)
+		_ = s.NewDevice(i)
 	}
 	if err := s.ListenTCP("127.0.0.1:3333"); err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
@@ -290,9 +290,9 @@ func TestBroadcastRead(t *testing.T) {
 
 	// send Broadcast
 	_, err := client.ReadHoldingRegisters(1, 2)
-	goterr := fmt.Sprintf("%v", err)
-	expecterr := "127.0.0.1:3333: i/o timeout"
-	if !strings.Contains(goterr, expecterr) {
-		t.Errorf("expected %v, got %v", expecterr, goterr)
+	gotErr := fmt.Sprintf("%v", err)
+	expectErr := "127.0.0.1:3333: i/o timeout"
+	if !strings.Contains(gotErr, expectErr) {
+		t.Errorf("expected %v, got %v", expectErr, gotErr)
 	}
 }
