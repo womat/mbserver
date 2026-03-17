@@ -2,10 +2,11 @@ package mbserver
 
 import (
 	"fmt"
-	"github.com/goburrow/modbus"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/goburrow/modbus"
 )
 
 func TestNewDevice(t *testing.T) {
@@ -162,8 +163,8 @@ func TestModbus(t *testing.T) {
 	}
 
 	// Input registers
-	s.Devices[100].InputRegisters[65530] = 1
-	s.Devices[100].InputRegisters[65535] = 65535
+	s.devices[100].InputRegisters[65530] = 1
+	s.devices[100].InputRegisters[65535] = 65535
 	results, err = client.ReadInputRegisters(65530, 6)
 	if err != nil {
 		t.Errorf("expected nil, got %v\n", err)

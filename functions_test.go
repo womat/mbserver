@@ -20,10 +20,10 @@ func TestReadCoils(t *testing.T) {
 	s := NewServer()
 	s.NewDevice(deviceid)
 	// Set the coil values
-	s.Devices[deviceid].Coils[10] = 1
-	s.Devices[deviceid].Coils[11] = 1
-	s.Devices[deviceid].Coils[17] = 1
-	s.Devices[deviceid].Coils[18] = 1
+	s.devices[deviceid].Coils[10] = 1
+	s.devices[deviceid].Coils[11] = 1
+	s.devices[deviceid].Coils[17] = 1
+	s.devices[deviceid].Coils[18] = 1
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -57,10 +57,10 @@ func TestReadDiscreteInputs(t *testing.T) {
 	s := NewServer()
 	s.NewDevice(deviceid)
 	// Set the discrete input values
-	s.Devices[deviceid].DiscreteInputs[0] = 1
-	s.Devices[deviceid].DiscreteInputs[7] = 1
-	s.Devices[deviceid].DiscreteInputs[8] = 1
-	s.Devices[deviceid].DiscreteInputs[9] = 1
+	s.devices[deviceid].DiscreteInputs[0] = 1
+	s.devices[deviceid].DiscreteInputs[7] = 1
+	s.devices[deviceid].DiscreteInputs[8] = 1
+	s.devices[deviceid].DiscreteInputs[9] = 1
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -92,9 +92,9 @@ func TestReadHoldingRegisters(t *testing.T) {
 	s := NewServer()
 	s.NewDevice(deviceid)
 
-	s.Devices[deviceid].HoldingRegisters[100] = 1
-	s.Devices[deviceid].HoldingRegisters[101] = 2
-	s.Devices[deviceid].HoldingRegisters[102] = 65535
+	s.devices[deviceid].HoldingRegisters[100] = 1
+	s.devices[deviceid].HoldingRegisters[101] = 2
+	s.devices[deviceid].HoldingRegisters[102] = 65535
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -123,9 +123,9 @@ func TestReadHoldingRegisters(t *testing.T) {
 func TestReadInputRegisters(t *testing.T) {
 	s := NewServer()
 
-	s.Devices[1].InputRegisters[200] = 1
-	s.Devices[1].InputRegisters[201] = 2
-	s.Devices[1].InputRegisters[202] = 65535
+	s.devices[1].InputRegisters[200] = 1
+	s.devices[1].InputRegisters[201] = 2
+	s.devices[1].InputRegisters[202] = 65535
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -171,7 +171,7 @@ func TestWriteSingleCoil(t *testing.T) {
 		t.FailNow()
 	}
 	expect := 1
-	got := s.Devices[1].Coils[65535]
+	got := s.devices[1].Coils[65535]
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v\n", expect, got)
 	}
@@ -198,7 +198,7 @@ func TestWriteHoldingRegister(t *testing.T) {
 		t.FailNow()
 	}
 	expect := 6
-	got := s.Devices[1].HoldingRegisters[5]
+	got := s.devices[1].HoldingRegisters[5]
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v\n", expect, got)
 	}
@@ -225,7 +225,7 @@ func TestWriteMultipleCoils(t *testing.T) {
 		t.FailNow()
 	}
 	expect := []byte{1, 1}
-	got := s.Devices[1].Coils[1:3]
+	got := s.devices[1].Coils[1:3]
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v\n", expect, got)
 	}
@@ -254,7 +254,7 @@ func TestWriteHoldingRegisters(t *testing.T) {
 		t.FailNow()
 	}
 	expect := []uint16{3, 4}
-	got := s.Devices[deviceid].HoldingRegisters[1:3]
+	got := s.devices[deviceid].HoldingRegisters[1:3]
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v\n", expect, got)
 	}

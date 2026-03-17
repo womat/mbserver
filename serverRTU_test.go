@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/womat/framereader"
+	"github.com/womat/mbserver/pkg/framereader"
 )
 
 type frame struct {
@@ -117,12 +117,12 @@ func TestListenRTU(t *testing.T) {
 	serv := NewServer()
 	serv.NewDevice(3)
 
-	serv.Devices[1].HoldingRegisters[1000] = 0x1122
-	serv.Devices[1].HoldingRegisters[2000] = 0x3344
-	serv.Devices[1].HoldingRegisters[2001] = 0x5566
-	serv.Devices[1].HoldingRegisters[2002] = 0x7788
-	serv.Devices[1].HoldingRegisters[2003] = 0x9900
-	serv.Devices[3].HoldingRegisters[1000] = 0x1234
+	serv.devices[1].HoldingRegisters[1000] = 0x1122
+	serv.devices[1].HoldingRegisters[2000] = 0x3344
+	serv.devices[1].HoldingRegisters[2001] = 0x5566
+	serv.devices[1].HoldingRegisters[2002] = 0x7788
+	serv.devices[1].HoldingRegisters[2003] = 0x9900
+	serv.devices[3].HoldingRegisters[1000] = 0x1234
 
 	_ = serv.ListenRTU(reader)
 
@@ -213,12 +213,12 @@ func TestListenRTU1(t *testing.T) {
 	serv := NewServer()
 	serv.NewDevice(3)
 
-	serv.Devices[1].HoldingRegisters[1000] = 0x1122
-	serv.Devices[1].HoldingRegisters[2000] = 0x3344
-	serv.Devices[1].HoldingRegisters[2001] = 0x5566
-	serv.Devices[1].HoldingRegisters[2002] = 0x7788
-	serv.Devices[1].HoldingRegisters[2003] = 0x9900
-	serv.Devices[3].HoldingRegisters[1000] = 0x1234
+	serv.devices[1].HoldingRegisters[1000] = 0x1122
+	serv.devices[1].HoldingRegisters[2000] = 0x3344
+	serv.devices[1].HoldingRegisters[2001] = 0x5566
+	serv.devices[1].HoldingRegisters[2002] = 0x7788
+	serv.devices[1].HoldingRegisters[2003] = 0x9900
+	serv.devices[3].HoldingRegisters[1000] = 0x1234
 
 	_ = serv.ListenRTU(reader)
 

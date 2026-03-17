@@ -19,7 +19,7 @@ func (s *Server) acceptSerialRequests(port io.ReadWriteCloser) {
 		bytesRead, err := port.Read(buffer)
 		if err != nil {
 			if err != io.EOF {
-				errorlog.Printf("serial read error %v\n", err)
+				s.log.Error("Error reading serial port", "error", err)
 			}
 			continue
 		}
@@ -31,7 +31,7 @@ func (s *Server) acceptSerialRequests(port io.ReadWriteCloser) {
 
 			frame, err := NewRTUFrame(packet)
 			if err != nil {
-				warninglog.Printf("bad serial frame error %v\n", err)
+				s.log.Error("Error parsing RTU frame", "error", err)
 				continue
 			}
 

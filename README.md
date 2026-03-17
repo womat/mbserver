@@ -2,7 +2,7 @@
 
 This implementation is a fork of https://godoc.org/github.com/tbrandon/mbserver
 with additional functions:
-- support multiple Modbus Devices
+- support multiple Modbus devices
 - Modbus RTU is working
 - communication errors doesn'nt stop the server process
  
@@ -22,7 +22,7 @@ Bit access:
 
 TCP and serial RTU access is supported.
 
-Multiple Device Devices are supported.
+Multiple Device devices are supported.
 
 The server internally allocates memory for 65536 coils, 65536 discrete inputs, 653356 holding registers and 65536 input registers for each Modbus Device.
 On start, Modbus Device 1 is initialized and all values are initialzied to zero. Additional Decices can be added.  
@@ -95,7 +95,7 @@ Outputs:
 results [0 3 0 4 0 5]
 ```
 
-## Example Listening on Multiple TCP Ports and Serial Devices
+## Example Listening on Multiple TCP Ports and Serial devices
 
 The Golang Modbus Server can listen on multiple TCP ports and serial devices.
 In the following example, the Modbus server will be configured to listen on

@@ -13,7 +13,7 @@ func (s *Server) accept(listen net.Listener) error {
 			if strings.Contains(err.Error(), "use of closed network connection") {
 				return nil
 			}
-			warninglog.Printf("Unable to accept connections: %#v\n", err)
+			s.log.Warn("Unable to accept connection", "error", err)
 			return err
 		}
 
@@ -25,7 +25,7 @@ func (s *Server) accept(listen net.Listener) error {
 				bytesRead, err := conn.Read(packet)
 				if err != nil {
 					if err != io.EOF {
-						warninglog.Printf("read error %v\n", err)
+						s.log.Warn("Unable to read packet", "error", err)
 					}
 					return
 				}
@@ -34,7 +34,7 @@ func (s *Server) accept(listen net.Listener) error {
 
 				frame, err := NewTCPFrame(packet)
 				if err != nil {
-					warninglog.Printf("bad packet error %v\n", err)
+					s.log.Warn("Unable to parse packet", "error", err)
 					return
 				}
 
@@ -50,7 +50,7 @@ func (s *Server) accept(listen net.Listener) error {
 func (s *Server) ListenTCP(addressPort string) (err error) {
 	listen, err := net.Listen("tcp", addressPort)
 	if err != nil {
-		errorlog.Printf("Failed to Listen: %v\n", err)
+		s.log.Error("Unable to listen", "error", err)
 		return err
 	}
 	s.listeners = append(s.listeners, listen)

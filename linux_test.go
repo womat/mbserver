@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package mbserver
@@ -8,8 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/goburrow/modbus"
-	"github.com/womat/framereader"
+	"github.com/womat/mbserver/pkg/framereader"
 )
 
 // The serial read and close has a known race condition.

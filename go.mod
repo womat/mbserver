@@ -1,9 +1,7 @@
 module github.com/womat/mbserver
 
-go 1.15
+go 1.25
 
-require (
-	github.com/goburrow/modbus v0.1.0
-	github.com/goburrow/serial v0.1.0 // indirect
-	github.com/womat/framereader v0.0.14
-)
+require github.com/goburrow/modbus v0.1.0
+
+require github.com/goburrow/serial v0.1.0 // indirect

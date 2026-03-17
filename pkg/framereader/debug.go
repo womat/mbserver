@@ -1,7 +1,8 @@
-package mbserver
+package framereader
 
 import (
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 )
@@ -85,12 +86,12 @@ func init() {
 }
 
 func SetDebug(w io.Writer, flag int) {
-	warningHandle := io.Discard
-	infoHandle := io.Discard
-	errorHandle := io.Discard
-	debugHandle := io.Discard
-	traceHandle := io.Discard
-	fatalHandle := io.Discard
+	warningHandle := ioutil.Discard
+	infoHandle := ioutil.Discard
+	errorHandle := ioutil.Discard
+	debugHandle := ioutil.Discard
+	traceHandle := ioutil.Discard
+	fatalHandle := ioutil.Discard
 
 	if flag&Info != 0 {
 		warningHandle = w

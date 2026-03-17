@@ -2,21 +2,24 @@
 package mbserver
 
 import (
-	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
+	"sync"
 )
 
 // Server is a Modbus slave with allocated memory for discrete inputs, coils, etc.
 type Server struct {
 	// Debug enables more verbose messaging.
+	mu          sync.RWMutex
+	log         slog.Logger
 	Debug       bool
 	listeners   []net.Listener
 	ports       []io.ReadWriteCloser
 	requestChan chan *Request
 	function    [256]func(*Server, Framer) ([]byte, Exception)
-	Devices     map[byte]Device
+	devices     map[byte]Device
 }
 
 // Request contains the connection and Modbus frame.
@@ -49,7 +52,7 @@ func NewServer() *Server {
 	s.function[16] = WriteHoldingRegisters
 
 	// Allocate Modbus memory maps.
-	s.Devices = map[byte]Device{}
+	s.devices = map[byte]Device{}
 	_ = s.NewDevice(1)
 
 	s.requestChan = make(chan *Request)
@@ -64,10 +67,14 @@ func (s *Server) NewDevice(id byte) error {
 	if id < idmin || id > idmax {
 		return fmt.Errorf("invalid modbus id %v", id)
 	}
-	if _, ok := s.Devices[id]; ok {
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.devices[id]; ok {
 		return fmt.Errorf("mbserver: device %v already exists", id)
 	}
-	s.Devices[id] = Device{
+	s.devices[id] = Device{
 		DiscreteInputs:   make([]byte, 65536),
 		Coils:            make([]byte, 65536),
 		HoldingRegisters: make([]uint16, 65536),
@@ -79,14 +86,16 @@ func (s *Server) NewDevice(id byte) error {
 
 // TODO Sollte auch nur Close heißen
 func (s *Server) RemoveDevice(id byte) error {
-	if id < idmin && id > idmax {
+	if id < idmin || id > idmax {
 		return fmt.Errorf("invalid modbus id %v", id)
 	}
-	if _, ok := s.Devices[id]; !ok {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.devices[id]; !ok {
 		return fmt.Errorf("mbserver: device %v doesn't exists", id)
 	}
 	// delete Modbus memory maps.
-	delete(s.Devices, id)
+	delete(s.devices, id)
 	return nil
 }
 
@@ -106,7 +115,7 @@ func (s *Server) handle(request *Request) Framer {
 		data, exception = s.function[function](s, request.frame)
 		response.SetData(data)
 	} else {
-		infolog.Printf("IllegalFunction: %v\n", function)
+		s.log.Error("illegal Function", function)
 		exception = IllegalFunction
 	}
 
@@ -122,25 +131,35 @@ func (s *Server) handler() {
 	for {
 		request := <-s.requestChan
 		device := request.frame.GetDevice()
+		s.mu.RLock()
 		if device == 0 {
-			debuglog.Printf("start modbus broadcast")
-			for device, _ := range s.Devices {
+			s.log.Info("starting modbus broadcast")
+			for device, _ := range s.devices {
 				request.frame.SetDevice(device)
 				_ = s.handle(request)
 				//  Broadcast doesn't send response!!
 			}
-			debuglog.Printf("end modbus broadcast:")
-		} else {
-			if _, ok := s.Devices[device]; !ok {
-				//  ignore request if device is unknown
-				debuglog.Printf("unknown deviceid: %v\n", device)
-				continue
-			}
-			response := s.handle(request)
-			r := response.Bytes()
-			tracelog.Printf("write serial port: %v", hex.EncodeToString(r))
-			request.conn.Write(r)
+
+			s.mu.RUnlock()
+
+			s.log.Info("modbus broadcast finished")
+			continue
 		}
+		if _, ok := s.devices[device]; !ok {
+			//  ignore request if device is unknown
+			s.mu.RUnlock()
+
+			s.log.Warn("modbus device doesn't exists", "device", device)
+			continue
+		}
+		response := s.handle(request)
+		r := response.Bytes()
+
+		s.log.Debug("modbus broadcast received", "request", request, "response", response)
+		s.mu.RUnlock()
+
+		request.conn.Write(r)
+
 	}
 }
 
