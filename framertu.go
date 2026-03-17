@@ -29,8 +29,8 @@ func NewRTUFrame(packet []byte) (*RTUFrame, error) {
 	}
 
 	frame := &RTUFrame{
-		Address:  uint8(packet[0]),
-		Function: uint8(packet[1]),
+		Address:  packet[0],
+		Function: packet[1],
 		Data:     packet[2 : pLen-2],
 		CRC:      crcCalc,
 	}
@@ -40,8 +40,8 @@ func NewRTUFrame(packet []byte) (*RTUFrame, error) {
 
 // Copy the RTUFrame.
 func (frame *RTUFrame) Copy() Framer {
-	copy := *frame
-	return &copy
+	c := *frame
+	return &c
 }
 
 // Bytes returns the Modbus byte stream based on the RTUFrame fields
@@ -71,7 +71,6 @@ func (frame *RTUFrame) GetDevice() uint8 {
 // SettDevice set the RTUFrame Modbus DeviceId.
 func (frame *RTUFrame) SetDevice(id uint8) {
 	frame.Address = id
-	return
 }
 
 // GetFunction returns the Modbus function code.
@@ -92,7 +91,7 @@ func (frame *RTUFrame) SetData(data []byte) {
 
 // SetException sets the Modbus exception code in the frame.
 func (frame *RTUFrame) SetException(exception Exception) {
-	frame.Function = frame.Function | 0x80
+	frame.Function |= 0x80
 	frame.Data = []byte{byte(exception)}
 }
 
@@ -103,13 +102,13 @@ func (frame *RTUFrame) GetFrameParts() (register uint16, numRegs int, device uin
 	device = frame.Address
 
 	if end := start + numRegs; end > 65536 {
-		err = fmt.Errorf("mbmaster: illegal data address %v\n", end)
+		err = fmt.Errorf("mbmaster: illegal data address %v", end)
 		exception = IllegalDataAddress
 		return
 	}
 
-	if device < idmin || device > idmax {
-		err = fmt.Errorf("mbmaster: invalid modbus id %v\n", device)
+	if device < idMin || device > idMax {
+		err = fmt.Errorf("mbmaster: invalid modbus id %v", device)
 		exception = SlaveDeviceFailure
 		return
 	}

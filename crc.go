@@ -24,7 +24,7 @@ import "sync"
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFINGEMENT. IN NO EVENT SHALL THE
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -33,7 +33,7 @@ import "sync"
  * Description
  * -----------
  * The source file src/crc16.c contains routines which calculate the common
- * CRC16 cyclic redundancy check values for an incomming byte string.
+ * CRC16 cyclic redundancy check values for an incoming byte string.
  */
 
 var crcTable []uint16
@@ -62,17 +62,16 @@ func crcInitTable() {
 	crcTable = make([]uint16, 256)
 
 	for i := uint16(0); i < 256; i++ {
-
 		crc := uint16(0)
-		c := uint16(i)
+		c := i
 
 		for j := uint16(0); j < 8; j++ {
 			if ((crc ^ c) & 0x0001) > 0 {
 				crc = (crc >> 1) ^ crc16IBM
 			} else {
-				crc = crc >> 1
+				crc >>= 1
 			}
-			c = c >> 1
+			c >>= 1
 		}
 		crcTable[i] = crc
 	}
