@@ -8,15 +8,15 @@ import (
 // ReadWriter is a convenience type that implements io.ReadWriter. Write
 // calls flush reader before writing the prompt.
 type ReadWriter struct {
-	writer io.Writer
+	write  func([]byte) (int, error)
 	reader *Reader
 }
 
 // NewReadWriter creates a new response reader
-func NewReadWriter(iorw io.ReadWriter, timeout time.Duration, interframedelay time.Duration) *ReadWriter {
+func NewReadWriter(iorw io.ReadWriter, timeout time.Duration, interFrameDelay time.Duration) *ReadWriter {
 	return &ReadWriter{
-		writer: iorw,
-		reader: NewReader(iorw, timeout, interframedelay),
+		write:  iorw.Write,
+		reader: NewReader(iorw, timeout, interFrameDelay),
 	}
 }
 
@@ -27,10 +27,10 @@ func (rw *ReadWriter) Read(buffer []byte) (int, error) {
 
 // Write flushes all data from reader, and then passes through write call.
 func (rw *ReadWriter) Write(buffer []byte) (int, error) {
-	n, err := rw.reader.Flush()
+	n, err := rw.reader.Read(buffer)
 	if err != nil {
 		return n, err
 	}
 
-	return rw.writer.Write(buffer)
+	return rw.write(buffer)
 }

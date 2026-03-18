@@ -47,7 +47,7 @@ func TestNewDeviceExists(t *testing.T) {
 
 func TestAduRegisterAndNumber(t *testing.T) {
 	var frame TCPFrame
-	SetDataWithRegisterAndNumber(&frame, 0, 64)
+	SetRegisterData(&frame, 0, 64)
 
 	expect := []byte{0, 0, 0, 64}
 	got := frame.Data
@@ -58,7 +58,7 @@ func TestAduRegisterAndNumber(t *testing.T) {
 
 func TestAduSetDataWithRegisterAndNumberAndValues(t *testing.T) {
 	var frame TCPFrame
-	SetDataWithRegisterAndNumberAndValues(&frame, 7, 2, []uint16{3, 4})
+	SetRegisterValues(&frame, 7, 2, []uint16{3, 4})
 
 	expect := []byte{0, 7, 0, 2, 4, 0, 3, 0, 4}
 	got := frame.Data

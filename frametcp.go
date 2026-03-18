@@ -22,16 +22,24 @@ func NewTCPFrame(packet []byte) (*TCPFrame, error) {
 		return nil, fmt.Errorf("TCP Frame error: packet less than 9 bytes")
 	}
 
+	data := make([]byte, len(packet)-8)
+	copy(data, packet[8:])
+
 	frame := &TCPFrame{
 		TransactionIdentifier: binary.BigEndian.Uint16(packet[0:2]),
 		ProtocolIdentifier:    binary.BigEndian.Uint16(packet[2:4]),
 		Length:                binary.BigEndian.Uint16(packet[4:6]),
 		Device:                packet[6],
 		Function:              packet[7],
-		Data:                  packet[8:],
+		Data:                  data,
+	}
+
+	if frame.ProtocolIdentifier != 0 {
+		return nil, fmt.Errorf("invalid protocol identifier: %d", frame.ProtocolIdentifier)
 	}
 
 	// Check expected vs actual packet length.
+	// Length field covers Device (1) + Function (1) + Data (n) = 2 + len(Data)
 	if int(frame.Length) != len(frame.Data)+2 {
 		return nil, fmt.Errorf("specified packet length does not match actual packet length")
 	}
@@ -42,21 +50,23 @@ func NewTCPFrame(packet []byte) (*TCPFrame, error) {
 // Copy the TCPFrame.
 func (frame *TCPFrame) Copy() Framer {
 	c := *frame
+	c.Data = make([]byte, len(frame.Data))
+	copy(c.Data, frame.Data)
 	return &c
 }
 
 // Bytes returns the Modbus byte stream based on the TCPFrame fields
 func (frame *TCPFrame) Bytes() []byte {
-	bytes := make([]byte, 8)
+	buf := make([]byte, 8)
 
-	binary.BigEndian.PutUint16(bytes[0:2], frame.TransactionIdentifier)
-	binary.BigEndian.PutUint16(bytes[2:4], frame.ProtocolIdentifier)
-	binary.BigEndian.PutUint16(bytes[4:6], uint16(2+len(frame.Data)))
-	bytes[6] = frame.Device
-	bytes[7] = frame.Function
-	bytes = append(bytes, frame.Data...)
+	binary.BigEndian.PutUint16(buf[0:2], frame.TransactionIdentifier)
+	binary.BigEndian.PutUint16(buf[2:4], frame.ProtocolIdentifier)
+	binary.BigEndian.PutUint16(buf[4:6], uint16(2+len(frame.Data)))
+	buf[6] = frame.Device
+	buf[7] = frame.Function
+	buf = append(buf, frame.Data...)
 
-	return bytes
+	return buf
 }
 
 // GetDevice returns the Modbus DeviceId.
@@ -64,7 +74,7 @@ func (frame *TCPFrame) GetDevice() uint8 {
 	return frame.Device
 }
 
-// SettDevice set the RTUFrame Modbus DeviceId.
+// SetDevice set the TCPFrame Modbus DeviceId.
 func (frame *TCPFrame) SetDevice(id uint8) {
 	frame.Device = id
 }
@@ -95,27 +105,4 @@ func (frame *TCPFrame) SetException(exception Exception) {
 
 func (frame *TCPFrame) setLength() {
 	frame.Length = uint16(len(frame.Data) + 2)
-}
-
-func (frame TCPFrame) GetFrameParts() (register uint16, numRegs int, device uint8, exception Exception, err error) {
-	data := frame.GetData()
-	start := int(binary.BigEndian.Uint16(data[0:2]))
-	numRegs = int(binary.BigEndian.Uint16(data[2:4]))
-	device = frame.Device
-
-	if end := start + numRegs; end > 65536 {
-		err = fmt.Errorf("mbmaster: illegal data address %v", end)
-		exception = IllegalDataAddress
-		return
-	}
-
-	if device < idMin || device > idMax {
-		err = fmt.Errorf("mbmaster: invalid modbus id %v", device)
-		exception = SlaveDeviceFailure
-		return
-	}
-
-	register = uint16(start)
-	exception = Success
-	return
 }

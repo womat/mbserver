@@ -2,6 +2,8 @@
 package mbserver
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -9,17 +11,31 @@ import (
 	"sync"
 )
 
+var (
+	ErrAlreadyStarted = errors.New("server already started")
+)
+
+const (
+	// defaultMaxConnections limits concurrent clients to prevent resource exhaustion.
+	defaultMaxConnections = 100
+)
+
 // Server is a Modbus slave with allocated memory for discrete inputs, coils, etc.
 type Server struct {
 	// Debug enables more verbose messaging.
-	mu          sync.RWMutex
-	log         slog.Logger
-	Debug       bool
-	listeners   []net.Listener
-	ports       []io.ReadWriteCloser
-	requestChan chan *Request
-	function    [256]func(*Server, Framer) ([]byte, Exception)
-	devices     map[byte]Device
+	mu        sync.RWMutex
+	log       *slog.Logger
+	listeners []net.Listener
+
+	ports    []io.ReadWriteCloser
+	function [256]func(*Server, Framer) ([]byte, Exception)
+	devices  map[byte]Device
+
+	connSemaphore chan struct{} // limits concurrent connections
+
+	startOnce sync.Once
+	wg        sync.WaitGroup // tracks active goroutines for clean shutdown
+	request   chan Request
 }
 
 // Request contains the connection and Modbus frame.
@@ -36,10 +52,13 @@ type Device struct {
 	InputRegisters   []uint16
 }
 
-// TODO Sollte auch nur New heißen
 // NewServer creates a new Modbus server (slave).
-func NewServer() *Server {
-	s := &Server{}
+func NewServer(log *slog.Logger) *Server {
+	s := &Server{
+		log:           log,
+		request:       make(chan Request),
+		connSemaphore: make(chan struct{}, defaultMaxConnections),
+	}
 
 	// Add default functions.
 	s.function[1] = ReadCoils
@@ -54,17 +73,25 @@ func NewServer() *Server {
 	// Allocate Modbus memory maps.
 	s.devices = map[byte]Device{}
 	_ = s.NewDevice(1)
-
-	s.requestChan = make(chan *Request)
-	go s.handler()
-
 	return s
 }
 
-// TODO >> sollte einen Pointer zu den Registern zurückgeben
-// TODO Sollte auch nur New heißen
+func (s *Server) Start(ctx context.Context) error {
+
+	err := ErrAlreadyStarted
+	s.startOnce.Do(func() {
+		err = nil
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.handler(ctx)
+		}()
+	})
+	return err
+}
+
 func (s *Server) NewDevice(id byte) error {
-	if id < idmin || id > idmax {
+	if id < idMin || id > idMax {
 		return fmt.Errorf("invalid modbus id %v", id)
 	}
 
@@ -86,7 +113,7 @@ func (s *Server) NewDevice(id byte) error {
 
 // TODO Sollte auch nur Close heißen
 func (s *Server) RemoveDevice(id byte) error {
-	if id < idmin || id > idmax {
+	if id < idMin || id > idMax {
 		return fmt.Errorf("invalid modbus id %v", id)
 	}
 	s.mu.Lock()
@@ -101,10 +128,12 @@ func (s *Server) RemoveDevice(id byte) error {
 
 // RegisterFunctionHandler override the default behavior for a given Modbus function.
 func (s *Server) RegisterFunctionHandler(funcCode uint8, function func(*Server, Framer) ([]byte, Exception)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.function[funcCode] = function
 }
 
-func (s *Server) handle(request *Request) Framer {
+func (s *Server) handle(request Request) Framer {
 	var exception Exception
 	var data []byte
 
@@ -127,48 +156,59 @@ func (s *Server) handle(request *Request) Framer {
 }
 
 // All requests are handled synchronously to prevent modbus memory corruption.
-func (s *Server) handler() {
+func (s *Server) handler(ctx context.Context) {
 	for {
-		request := <-s.requestChan
-		device := request.frame.GetDevice()
-		s.mu.RLock()
-		if device == 0 {
-			s.log.Info("starting modbus broadcast")
-			for device, _ := range s.devices {
-				request.frame.SetDevice(device)
-				_ = s.handle(request)
-				//  Broadcast doesn't send response!!
+		select {
+		case <-ctx.Done():
+			return
+
+		case request := <-s.request:
+			device := request.frame.GetDevice()
+			// s.mu.RLock()    ← weg
+			if device == 0 {
+				// broadcast
+				s.mu.RLock() // nur für das Lesen der device-Map
+				devices := make([]byte, 0, len(s.devices))
+				for id := range s.devices {
+					devices = append(devices, id)
+				}
+				s.mu.RUnlock()
+
+				for _, id := range devices { // Lock-frei iterieren
+					request.frame.SetDevice(id)
+					_ = s.handle(request) // handle() holt eigenen Lock
+				}
+				continue
 			}
 
+			s.mu.RLock()
+			_, ok := s.devices[device]
 			s.mu.RUnlock()
 
-			s.log.Info("modbus broadcast finished")
-			continue
+			if !ok {
+				s.log.Warn("modbus device doesn't exists", "device", device)
+				continue
+			}
+
+			response := s.handle(request) // handle() → ReadCoils etc. → eigener Lock
+			if _, err := request.conn.Write(response.Bytes()); err != nil {
+				s.log.Warn("failed to write response", "error", err)
+			}
 		}
-		if _, ok := s.devices[device]; !ok {
-			//  ignore request if device is unknown
-			s.mu.RUnlock()
-
-			s.log.Warn("modbus device doesn't exists", "device", device)
-			continue
-		}
-		response := s.handle(request)
-		r := response.Bytes()
-
-		s.log.Debug("modbus broadcast received", "request", request, "response", response)
-		s.mu.RUnlock()
-
-		request.conn.Write(r)
-
 	}
 }
 
 // Close stops listening to TCP/IP ports and closes serial ports.
 func (s *Server) Close() {
+	s.mu.Lock()
+
 	for _, listen := range s.listeners {
-		listen.Close()
+		_ = listen.Close()
 	}
 	for _, port := range s.ports {
-		port.Close()
+		_ = port.Close()
 	}
+	s.mu.Unlock()
+
+	s.wg.Wait()
 }

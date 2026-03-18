@@ -24,6 +24,9 @@ const (
 	NegativeAcknowledge Exception = 7
 	// MemoryParityError Slave detected a parity error in memory. Master can retry the request, but service may be required on the slave device.
 	MemoryParityError Exception = 8
+
+	// 9 is reserved by the Modbus specification.
+
 	// GatewayPathUnavailable Specialized for Modbus gateways. Indicates a misconfigured gateway.
 	GatewayPathUnavailable Exception = 10
 	// GatewayTargetDeviceFailedToRespond Specialized for Modbus gateways. Sent when slave fails to respond.
@@ -31,7 +34,7 @@ const (
 )
 
 func (e Exception) Error() string {
-	return fmt.Sprintf("%d", e)
+	return fmt.Sprintf("modbus exception %d: %s", e, e.String())
 }
 
 func (e Exception) String() string {

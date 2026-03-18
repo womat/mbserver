@@ -8,9 +8,9 @@ import (
 // ReadWriteCloser is a convenience type that implements io.ReadWriteCloser.
 // Write calls flush reader before writing the prompt.
 type ReadWriteCloser struct {
-	reader *Reader
-	writer io.Writer
-	closer io.Closer
+	reader *ReadCloser
+	write  func([]byte) (int, error)
+	close  func() error
 }
 
 // NewReadWriteCloser creates a new response reader
@@ -23,9 +23,9 @@ type ReadWriteCloser struct {
 // is considered finished and the Read returns.
 func NewReadWriteCloser(iorw io.ReadWriteCloser, timeout time.Duration, interframedelay time.Duration) *ReadWriteCloser {
 	return &ReadWriteCloser{
-		closer: iorw,
-		writer: iorw,
-		reader: NewReader(iorw, timeout, interframedelay),
+		close:  iorw.Close,
+		write:  iorw.Write,
+		reader: NewReadCloser(iorw, timeout, interframedelay),
 	}
 }
 
@@ -41,11 +41,11 @@ func (rwc *ReadWriteCloser) Write(buffer []byte) (int, error) {
 		return n, err
 	}
 
-	return rwc.writer.Write(buffer)
+	return rwc.write(buffer)
 }
 
 // Close is a passthrough call.
 func (rwc *ReadWriteCloser) Close() error {
-	rwc.reader.closed = true
-	return rwc.closer.Close()
+	rwc.reader.Close()
+	return rwc.close()
 }

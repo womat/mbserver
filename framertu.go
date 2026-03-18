@@ -10,7 +10,6 @@ type RTUFrame struct {
 	Address  uint8
 	Function uint8
 	Data     []byte
-	CRC      uint16
 }
 
 // NewRTUFrame converts a packet to a Modbus RTU frame.
@@ -25,14 +24,16 @@ func NewRTUFrame(packet []byte) (*RTUFrame, error) {
 	crcExpect := binary.LittleEndian.Uint16(packet[pLen-2 : pLen])
 	crcCalc := crcModbus(packet[0 : pLen-2])
 	if crcCalc != crcExpect {
-		return nil, fmt.Errorf("RTU Frame error: CRC (expected 0x%x, got 0x%x)", crcExpect, crcCalc)
+		return nil, fmt.Errorf("RTU frame CRC mismatch: packet=0x%04x calculated=0x%04x", crcExpect, crcCalc)
 	}
+
+	data := make([]byte, pLen-4)
+	copy(data, packet[2:pLen-2])
 
 	frame := &RTUFrame{
 		Address:  packet[0],
 		Function: packet[1],
-		Data:     packet[2 : pLen-2],
-		CRC:      crcCalc,
+		Data:     data,
 	}
 
 	return frame, nil
@@ -41,26 +42,21 @@ func NewRTUFrame(packet []byte) (*RTUFrame, error) {
 // Copy the RTUFrame.
 func (frame *RTUFrame) Copy() Framer {
 	c := *frame
+	c.Data = make([]byte, len(frame.Data))
+	copy(c.Data, frame.Data)
 	return &c
 }
 
 // Bytes returns the Modbus byte stream based on the RTUFrame fields
 func (frame *RTUFrame) Bytes() []byte {
-	bytes := make([]byte, 2)
 
-	bytes[0] = frame.Address
-	bytes[1] = frame.Function
-	bytes = append(bytes, frame.Data...)
+	buf := make([]byte, 0, 2+len(frame.Data)+2) // 2 bytes for address and function, len(frame.Data) for data, 2 bytes for CRC
+	buf = append(buf, frame.Address, frame.Function)
+	buf = append(buf, frame.Data...)
 
-	// Calculate the CRC.
-	pLen := len(bytes)
-	crc := crcModbus(bytes[0:pLen])
-
-	// Add the CRC.
-	bytes = append(bytes, []byte{0, 0}...)
-	binary.LittleEndian.PutUint16(bytes[pLen:pLen+2], crc)
-
-	return bytes
+	crc := crcModbus(buf)
+	buf = binary.LittleEndian.AppendUint16(buf, crc)
+	return buf
 }
 
 // GetDevice returns the Modbus DeviceId.
@@ -68,7 +64,7 @@ func (frame *RTUFrame) GetDevice() uint8 {
 	return frame.Address
 }
 
-// SettDevice set the RTUFrame Modbus DeviceId.
+// SetDevice set the RTUFrame Modbus DeviceId.
 func (frame *RTUFrame) SetDevice(id uint8) {
 	frame.Address = id
 }
@@ -93,27 +89,4 @@ func (frame *RTUFrame) SetData(data []byte) {
 func (frame *RTUFrame) SetException(exception Exception) {
 	frame.Function |= 0x80
 	frame.Data = []byte{byte(exception)}
-}
-
-func (frame *RTUFrame) GetFrameParts() (register uint16, numRegs int, device uint8, exception Exception, err error) {
-	data := frame.GetData()
-	start := int(binary.BigEndian.Uint16(data[0:2]))
-	numRegs = int(binary.BigEndian.Uint16(data[2:4]))
-	device = frame.Address
-
-	if end := start + numRegs; end > 65536 {
-		err = fmt.Errorf("mbmaster: illegal data address %v", end)
-		exception = IllegalDataAddress
-		return
-	}
-
-	if device < idMin || device > idMax {
-		err = fmt.Errorf("mbmaster: invalid modbus id %v", device)
-		exception = SlaveDeviceFailure
-		return
-	}
-
-	register = uint16(start)
-	exception = Success
-	return
 }

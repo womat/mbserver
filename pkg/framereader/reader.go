@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// framesize is the max buffer size
-const framesize = 255
+// frameSize is the max buffer size
+const frameSize = 255
 
 // Reader is used for prompt/response communication protocols where a prompt
 // is sent, and some time later a response is received. Typically, the target takes
@@ -17,12 +17,14 @@ const framesize = 255
 // The thought is that once you received the 1st byte, all the data should stream out
 // continuously and a short timeout can be used to determine the end of the packet.
 type Reader struct {
-	reader          io.Reader
+	ioRead          func(p []byte) (int, error)
 	timeout         time.Duration
-	interframedelay time.Duration
-	dataChan        chan []byte
-	closed          bool
+	interFrameDelay time.Duration
+	data            chan []byte
+	stop            chan struct{}
 }
+
+var ErrZeroBuffer = errors.New("must supply non-zero length buffer")
 
 // NewReader creates a new response reader.
 //
@@ -32,64 +34,68 @@ type Reader struct {
 // chunkTimeout is used to specify the max timeout between chunks of data once
 // the response is started. If a delay of chunkTimeout is encountered, the response
 // is considered finished and the Read returns.
-func NewReader(reader io.Reader, timeout time.Duration, interframedelay time.Duration) *Reader {
+func NewReader(ioReader io.Reader, timeout time.Duration, interFrameDelay time.Duration) *Reader {
 	r := Reader{
-		reader:          reader,
+		ioRead:          ioReader.Read,
 		timeout:         timeout,
-		interframedelay: interframedelay,
-		dataChan:        make(chan []byte, 5),
+		interFrameDelay: interFrameDelay,
+		data:            make(chan []byte),
+		stop:            make(chan struct{}),
 	}
 	// we have to start a reader goroutine here that lives for the life
 	// of the reader because there is no
 	// way to stop a blocked goroutine
-	go r.framereader()
-
+	go r.frameReader()
 	return &r
 }
 
 // Read response
-func (r *Reader) Read(buffer []byte) (n int, err error) {
+func (r *Reader) Read(buffer []byte) (int, error) {
 	if len(buffer) <= 0 {
-		return 0, errors.New("must supply non-zero length buffer")
+		return 0, ErrZeroBuffer
 	}
 
 	timeout := time.NewTimer(r.timeout)
+	defer timeout.Stop()
 
 	select {
-	case b, ok := <-r.dataChan:
-		n = copy(buffer, b)
+	case b, ok := <-r.data:
 		if !ok {
-			err = io.EOF
+			return 0, io.EOF
 		}
-	case <-timeout.C:
-		err = io.EOF
-	}
 
-	return
+		n := copy(buffer, b)
+		return n, nil
+
+	case <-r.stop:
+		return 0, io.EOF
+
+	case <-timeout.C:
+		return 0, io.EOF
+	}
 }
 
 // Flush is used to flush any input data
-func (r *Reader) Flush() (n int, err error) {
-	frames := 0
-	timeout := time.NewTimer(r.interframedelay)
+func (r *Reader) Flush() (int, error) {
+	timeout := time.NewTimer(r.interFrameDelay)
+	defer timeout.Stop()
 
-	defer func() {
-		debuglog.Printf("drop %v frames (%v bytes)\n", frames, n)
-	}()
-
+	n := 0
 	for {
 		select {
-		case newData, ok := <-r.dataChan:
-			n += len(newData)
-			tracelog.Printf("drop frame with %v bytes\n", len(newData))
-
+		case newData, ok := <-r.data:
 			if !ok {
-				return n, io.EOF
+				return 0, io.EOF
 			}
 
-			frames++
-			timeout.Reset(r.interframedelay)
+			n += len(newData)
+			if !timeout.Stop() {
+				<-timeout.C
+			}
+			timeout.Reset(r.interFrameDelay)
 
+		case <-r.stop:
+			return n, nil
 		case <-timeout.C:
 			return n, nil
 		}

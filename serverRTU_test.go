@@ -77,17 +77,17 @@ func TestListenRTU(t *testing.T) {
 	testSequenz = testsequenz{sequenz: 0, frames: []testFrame{}}
 	rtuframe := RTUFrame{Address: 1, Function: 3}
 
-	SetDataWithRegisterAndNumberAndValues(&rtuframe, 1000, 1, []uint16{})
+	SetRegisterValues(&rtuframe, 1000, 1, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x01, 0x03, 0x02, 0x11, 0x22, 0x34, 0x0d}})
 
-	SetDataWithRegisterAndNumberAndValues(&rtuframe, 2000, 4, []uint16{})
+	SetRegisterValues(&rtuframe, 2000, 4, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x01, 0x03, 0x08, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0x00, 0x27, 0x11}})
 
-	SetDataWithRegisterAndNumberAndValues(&rtuframe, 3000, 2, []uint16{})
+	SetRegisterValues(&rtuframe, 3000, 2, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x01, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00, 0xfa, 0x33}})
 
 	rtuframe = RTUFrame{Address: 3, Function: 3}
-	SetDataWithRegisterAndNumberAndValues(&rtuframe, 1000, 1, []uint16{})
+	SetRegisterValues(&rtuframe, 1000, 1, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x03, 0x03, 0x02, 0x12, 0x34, 0xcc, 0xf3}})
 
 	source := &dataSource{
@@ -139,20 +139,20 @@ func TestListenRTU1(t *testing.T) {
 	testSequenz = testsequenz{sequenz: 0, frames: []testFrame{}}
 	rtuframe := RTUFrame{Address: 1, Function: 3}
 
-	SetDataWithRegisterAndNumberAndValues(&rtuframe, 1000, 1, []uint16{})
+	SetRegisterValues(&rtuframe, 1000, 1, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{01, 03, 0x02, 0x11, 0x22, 0x34, 0x0d}})
 
-	SetDataWithRegisterAndNumberAndValues(&rtuframe, 2000, 4, []uint16{})
+	SetRegisterValues(&rtuframe, 2000, 4, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x01, 0x03, 0x08, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0x00, 0x27, 0x11}})
 
-	SetDataWithRegisterAndNumberAndValues(&rtuframe, 3000, 2, []uint16{})
+	SetRegisterValues(&rtuframe, 3000, 2, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{01, 03, 04, 00, 00, 00, 00, 0xfa, 0x33}})
 
-	SetDataWithRegisterAndNumberAndValues(&rtuframe, 0000, 1, []uint16{})
+	SetRegisterValues(&rtuframe, 0000, 1, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{01, 03, 02, 00, 00, 0xb8, 0x44}})
 
 	rtuframe = RTUFrame{Address: 3, Function: 3}
-	SetDataWithRegisterAndNumberAndValues(&rtuframe, 1000, 1, []uint16{})
+	SetRegisterValues(&rtuframe, 1000, 1, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x03, 0x03, 0x02, 0x12, 0x34, 0xcc, 0xf3}})
 
 	source := &dataSource{

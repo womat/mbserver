@@ -1,7 +1,5 @@
 package mbserver
 
-import "sync"
-
 // Derived from https://github.com/lammertb/libcrc
 /*
  * Library: libcrc
@@ -36,35 +34,15 @@ import "sync"
  * CRC16 cyclic redundancy check values for an incoming byte string.
  */
 
-var crcTable []uint16
-var mux sync.Mutex
-
-func crcModbus(data []byte) (crc uint16) {
-	if crcTable == nil {
-		// Thread safe initialization.
-		mux.Lock()
-		if crcTable == nil {
-			crcInitTable()
-		}
-		mux.Unlock()
-	}
-
-	crc = 0xffff
-	for _, v := range data {
-		crc = (crc >> 8) ^ crcTable[(crc^uint16(v))&0x00FF]
-	}
-
-	return crc
-}
-
-func crcInitTable() {
-	crc16IBM := uint16(0xA001)
-	crcTable = make([]uint16, 256)
+// crcTable is computed once at program startup, before main().
+// Using a fixed-size array avoids heap allocation.
+var crcTable = func() [256]uint16 {
+	const crc16IBM = uint16(0xA001)
+	var table [256]uint16
 
 	for i := uint16(0); i < 256; i++ {
 		crc := uint16(0)
 		c := i
-
 		for j := uint16(0); j < 8; j++ {
 			if ((crc ^ c) & 0x0001) > 0 {
 				crc = (crc >> 1) ^ crc16IBM
@@ -73,6 +51,16 @@ func crcInitTable() {
 			}
 			c >>= 1
 		}
-		crcTable[i] = crc
+		table[i] = crc
 	}
+	return table
+}()
+
+func crcModbus(data []byte) (crc uint16) {
+	crc = 0xffff
+	for _, v := range data {
+		crc = (crc >> 8) ^ crcTable[(crc^uint16(v))&0x00FF]
+	}
+
+	return crc
 }

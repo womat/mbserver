@@ -9,7 +9,7 @@ import (
 // calls flush reader before writing the prompt.
 type ReadCloser struct {
 	reader *Reader
-	closer io.Closer
+	close  func() error
 }
 
 // NewReadCloser creates a new response reader
@@ -20,10 +20,10 @@ type ReadCloser struct {
 // chunkTimeout is used to specify the max timeout between chunks of data once
 // the response is started. If a delay of chunkTimeout is encountered, the response
 // is considered finished and the Read returns.
-func NewReadCloser(iorw io.ReadCloser, timeout time.Duration, interframedelay time.Duration) *ReadCloser {
+func NewReadCloser(iorw io.ReadCloser, timeout time.Duration, interFrameDelay time.Duration) *ReadCloser {
 	return &ReadCloser{
-		closer: iorw,
-		reader: NewReader(iorw, timeout, interframedelay),
+		close:  iorw.Close,
+		reader: NewReader(iorw, timeout, interFrameDelay),
 	}
 }
 
@@ -34,6 +34,11 @@ func (rc *ReadCloser) Read(buffer []byte) (int, error) {
 
 // Close is a passthrough call.
 func (rc *ReadCloser) Close() error {
-	rc.reader.closed = true
-	return rc.closer.Close()
+	close(rc.reader.stop) // alle Goroutinen stoppen
+	return rc.close()
+}
+
+// Flush is used to flush any input data
+func (rc *ReadCloser) Flush() (int, error) {
+	return rc.reader.Flush()
 }

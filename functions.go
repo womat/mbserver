@@ -10,7 +10,7 @@ func ReadCoils(s *Server, frame Framer) ([]byte, Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
 	device := frame.GetDevice()
 
-	if endRegister > 65536 {
+	if endRegister > 65535 {
 		s.log.Error("ReadCoils", "device", device, "register", register, "quantity", numRegs, "register", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
@@ -21,6 +21,9 @@ func ReadCoils(s *Server, frame Framer) ([]byte, Exception) {
 	}
 	data := make([]byte, 1+dataSize)
 	data[0] = byte(dataSize)
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for i, value := range s.devices[device].Coils[register:endRegister] {
 		if value != 0 {
 			shift := uint(i) % 8
@@ -37,7 +40,7 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
 	device := frame.GetDevice()
 
-	if endRegister > 65536 {
+	if endRegister > 65535 {
 		s.log.Error("ReadDiscreteInputs", "device", device, "register", register, "quantity", numRegs, "register", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
@@ -48,6 +51,8 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, Exception) {
 	}
 	data := make([]byte, 1+dataSize)
 	data[0] = byte(dataSize)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	for i, value := range s.devices[device].DiscreteInputs[register:endRegister] {
 		if value != 0 {
 			shift := uint(i) % 8
@@ -64,11 +69,13 @@ func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
 	device := frame.GetDevice()
 
-	if endRegister > 65536 {
+	if endRegister > 65535 {
 		s.log.Error("ReadHoldingRegisters", "device", device, "register", register, "quantity", numRegs, "register", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
 
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	r := append([]byte{byte(numRegs * 2)}, Uint16ToBytes(s.devices[device].HoldingRegisters[register:endRegister])...)
 	s.log.Debug("ReadHoldingRegisters response", "device", device, "register", register, "quantity", numRegs, "response", hex.EncodeToString(r))
 	return r, Success
@@ -79,11 +86,13 @@ func ReadInputRegisters(s *Server, frame Framer) ([]byte, Exception) {
 	register, numRegs, endRegister := registerAddressAndNumber(frame)
 	device := frame.GetDevice()
 
-	if endRegister > 65536 {
+	if endRegister > 65535 {
 		s.log.Error("ReadInputRegisters", "device", device, "register", register, "quantity", numRegs, "register", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
 
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	r := append([]byte{byte(numRegs * 2)}, Uint16ToBytes(s.devices[device].InputRegisters[register:endRegister])...)
 	s.log.Debug("ReadInputRegisters response", "device", device, "register", register, "quantity", numRegs, "response", hex.EncodeToString(r))
 	return r, Success
@@ -94,12 +103,17 @@ func WriteSingleCoil(s *Server, frame Framer) ([]byte, Exception) {
 	register, value := registerAddressAndValue(frame)
 	device := frame.GetDevice()
 
-	// TODO Should we use 0 for off and 65,280 (FF00 in hexadecimal) for on?
-	if value != 0 {
-		value = 1
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch value {
+	case 0x0000:
+		s.devices[device].Coils[register] = 0
+	case 0xFF00:
+		s.devices[device].Coils[register] = 1
+	default:
+		return []byte{}, IllegalDataValue
 	}
 
-	s.devices[device].Coils[register] = byte(value)
 	r := frame.GetData()[0:4]
 	s.log.Debug("WriteSingleCoil response", "device", device, "register", register, "value", value)
 	return r, Success
@@ -110,6 +124,8 @@ func WriteHoldingRegister(s *Server, frame Framer) ([]byte, Exception) {
 	register, value := registerAddressAndValue(frame)
 	device := frame.GetDevice()
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.devices[device].HoldingRegisters[register] = value
 	r := frame.GetData()[0:4]
 	s.log.Debug("WriteHoldingRegister response", "device", device, "register", register, "value", value, "response", hex.EncodeToString(r))
@@ -123,7 +139,7 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, Exception) {
 
 	valueBytes := frame.GetData()[5:]
 
-	if endRegister > 65536 {
+	if endRegister > 65535 {
 		s.log.Error("WriteMultipleCoils", "device", device, "register", register, "quantity", numRegs, "register", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
@@ -133,6 +149,8 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, Exception) {
 	//	return []byte{}, &IllegalDataAddress
 	//}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	bitCount := 0
 	for i, value := range valueBytes {
 		for bitPos := uint(0); bitPos < 8; bitPos++ {
@@ -158,7 +176,7 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, Exception) {
 	device := frame.GetDevice()
 	valueBytes := frame.GetData()[5:]
 
-	if endRegister > 65536 {
+	if endRegister > 65535 {
 		s.log.Error("WriteHoldingRegisters", "device", device, "register", register, "quantity", numRegs, "register", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
@@ -169,6 +187,8 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, Exception) {
 
 	// Copy data to memory
 	values := BytesToUint16(valueBytes)
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if valuesUpdated := copy(s.devices[device].HoldingRegisters[register:], values); valuesUpdated != numRegs {
 		s.log.Error("WriteHoldingRegisters", "device", device, "register", register, "quantity", numRegs, "valuesUpdated", valuesUpdated, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
@@ -180,23 +200,23 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, Exception) {
 }
 
 // BytesToUint16 converts a big endian array of bytes to an array of unit16s
-func BytesToUint16(bytes []byte) []uint16 {
-	values := make([]uint16, len(bytes)/2)
+func BytesToUint16(buf []byte) []uint16 {
+	values := make([]uint16, len(buf)/2)
 
 	for i := range values {
-		values[i] = binary.BigEndian.Uint16(bytes[i*2 : (i+1)*2])
+		values[i] = binary.BigEndian.Uint16(buf[i*2 : (i+1)*2])
 	}
 	return values
 }
 
 // Uint16ToBytes converts an array of uint16s to a big endian array of bytes
 func Uint16ToBytes(values []uint16) []byte {
-	bytes := make([]byte, len(values)*2)
+	buf := make([]byte, len(values)*2)
 
 	for i, value := range values {
-		binary.BigEndian.PutUint16(bytes[i*2:(i+1)*2], value)
+		binary.BigEndian.PutUint16(buf[i*2:(i+1)*2], value)
 	}
-	return bytes
+	return buf
 }
 
 func bitAtPosition(value uint8, pos uint) uint8 {

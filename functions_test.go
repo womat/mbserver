@@ -29,7 +29,7 @@ func TestReadCoils(t *testing.T) {
 	frame.Length = 6
 	frame.Device = deviceid
 	frame.Function = 1
-	SetDataWithRegisterAndNumber(&frame, 10, 9)
+	SetRegisterData(&frame, 10, 9)
 
 	var req Request
 	req.frame = &frame
@@ -66,7 +66,7 @@ func TestReadDiscreteInputs(t *testing.T) {
 	frame.Length = 6
 	frame.Device = deviceid
 	frame.Function = 2
-	SetDataWithRegisterAndNumber(&frame, 0, 10)
+	SetRegisterData(&frame, 0, 10)
 
 	var req Request
 	req.frame = &frame
@@ -100,7 +100,7 @@ func TestReadHoldingRegisters(t *testing.T) {
 	frame.Length = 6
 	frame.Device = deviceid
 	frame.Function = 3
-	SetDataWithRegisterAndNumber(&frame, 100, 3)
+	SetRegisterData(&frame, 100, 3)
 
 	var req Request
 	req.frame = &frame
@@ -131,7 +131,7 @@ func TestReadInputRegisters(t *testing.T) {
 	frame.Length = 6
 	frame.Device = 1
 	frame.Function = 4
-	SetDataWithRegisterAndNumber(&frame, 200, 3)
+	SetRegisterData(&frame, 200, 3)
 
 	var req Request
 	req.frame = &frame
@@ -158,7 +158,7 @@ func TestWriteSingleCoil(t *testing.T) {
 	frame.Length = 12
 	frame.Device = 1
 	frame.Function = 5
-	SetDataWithRegisterAndNumber(&frame, 65535, 1024)
+	SetRegisterData(&frame, 65535, 1024)
 
 	var req Request
 	req.frame = &frame
@@ -185,7 +185,7 @@ func TestWriteHoldingRegister(t *testing.T) {
 	frame.Length = 12
 	frame.Device = 1
 	frame.Function = 6
-	SetDataWithRegisterAndNumber(&frame, 5, 6)
+	SetRegisterData(&frame, 5, 6)
 
 	var req Request
 	req.frame = &frame
@@ -212,7 +212,7 @@ func TestWriteMultipleCoils(t *testing.T) {
 	frame.Length = 12
 	frame.Device = 1
 	frame.Function = 15
-	SetDataWithRegisterAndNumberAndBytes(&frame, 1, 2, []byte{3})
+	SetRegisterBytes(&frame, 1, 2, []byte{3})
 
 	var req Request
 	req.frame = &frame
@@ -241,7 +241,7 @@ func TestWriteHoldingRegisters(t *testing.T) {
 	frame.Length = 12
 	frame.Device = deviceid
 	frame.Function = 16
-	SetDataWithRegisterAndNumberAndValues(&frame, 1, 2, []uint16{3, 4})
+	SetRegisterValues(&frame, 1, 2, []uint16{3, 4})
 
 	var req Request
 	req.frame = &frame
@@ -289,7 +289,7 @@ func TestOutOfBounds(t *testing.T) {
 	req.frame = &frame
 
 	// bits
-	SetDataWithRegisterAndNumber(&frame, 65535, 2)
+	SetRegisterData(&frame, 65535, 2)
 
 	frame.Function = 1
 	response := s.handle(&req)
@@ -305,7 +305,7 @@ func TestOutOfBounds(t *testing.T) {
 		t.Errorf("expected IllegalDataAddress, got %v", exception.String())
 	}
 
-	SetDataWithRegisterAndNumberAndBytes(&frame, 65535, 2, []byte{3})
+	SetRegisterBytes(&frame, 65535, 2, []byte{3})
 	frame.Function = 15
 	response = s.handle(&req)
 	exception = GetException(response)
@@ -314,7 +314,7 @@ func TestOutOfBounds(t *testing.T) {
 	}
 
 	// registers
-	SetDataWithRegisterAndNumber(&frame, 65535, 2)
+	SetRegisterData(&frame, 65535, 2)
 
 	frame.Function = 3
 	response = s.handle(&req)
@@ -330,7 +330,7 @@ func TestOutOfBounds(t *testing.T) {
 		t.Errorf("expected IllegalDataAddress, got %v", exception.String())
 	}
 
-	SetDataWithRegisterAndNumberAndValues(&frame, 65535, 2, []uint16{0, 0})
+	SetRegisterValues(&frame, 65535, 2, []uint16{0, 0})
 	frame.Function = 16
 	response = s.handle(&req)
 	exception = GetException(response)
