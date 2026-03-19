@@ -52,7 +52,7 @@ func (ds *dataSource) Read(data []byte) (int, error) {
 }
 
 func (ds *dataSource) Write(data []byte) (int, error) {
-	testSequenz.frames[testSequenz.sequenz].got = data[:len(data)]
+	testSequenz.frames[testSequenz.sequenz].got = data[:]
 	testSequenz.sequenz++
 	return len(data), nil
 }
@@ -65,7 +65,6 @@ type testFrame = struct {
 	frame  []byte
 	expect []byte
 	got    []byte
-	ok     bool
 }
 
 type testsequenz = struct {
@@ -117,10 +116,10 @@ func TestListenRTU(t *testing.T) {
 
 	reader := framereader.NewReadWriteCloser(source, time.Second, time.Millisecond*5)
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	serv := NewServer(slog.Default())
 	if err := serv.Start(ctx); err != nil {
+		cancel()
 		t.Fatalf("failed to start server: %v", err)
 	}
 	serv.NewDevice(3)
@@ -135,6 +134,11 @@ func TestListenRTU(t *testing.T) {
 	serv.listenRTUFromReadWriter(ctx, reader)
 
 	time.Sleep(1000 * time.Millisecond)
+
+	// Cancel and wait for all goroutines to stop before checking results
+	// (prevents race with next test that resets testSequenz).
+	cancel()
+	serv.Close()
 
 	for _, f := range testSequenz.frames {
 		if !isEqual(f.expect, f.got) {
@@ -219,10 +223,10 @@ func TestListenRTU1(t *testing.T) {
 
 	reader := framereader.NewReadWriteCloser(source, time.Second, time.Millisecond*5)
 	ctx2, cancel2 := context.WithCancel(context.Background())
-	defer cancel2()
 
 	serv := NewServer(slog.Default())
 	if err := serv.Start(ctx2); err != nil {
+		cancel2()
 		t.Fatalf("failed to start server: %v", err)
 	}
 	serv.NewDevice(3)
@@ -237,6 +241,9 @@ func TestListenRTU1(t *testing.T) {
 	serv.listenRTUFromReadWriter(ctx2, reader)
 
 	time.Sleep(1 * time.Second)
+
+	cancel2()
+	serv.Close()
 
 	for _, f := range testSequenz.frames {
 		if !isEqual(f.expect, f.got) {

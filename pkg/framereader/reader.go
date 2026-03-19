@@ -3,11 +3,13 @@ package framereader
 import (
 	"errors"
 	"io"
+	"sync"
 	"time"
 )
 
-// frameSize is the max buffer size
-const frameSize = 255
+// frameSize is the read buffer size. 512 comfortably covers the maximum
+// Modbus RTU frame (256 bytes) with headroom for other protocols.
+const frameSize = 512
 
 // Reader is used for prompt/response communication protocols where a prompt
 // is sent, and some time later a response is received. Typically, the target takes
@@ -22,6 +24,7 @@ type Reader struct {
 	interFrameDelay time.Duration
 	data            chan []byte
 	stop            chan struct{}
+	closeOnce       sync.Once
 }
 
 var ErrZeroBuffer = errors.New("must supply non-zero length buffer")
@@ -47,6 +50,13 @@ func NewReader(ioReader io.Reader, timeout time.Duration, interFrameDelay time.D
 	// way to stop a blocked goroutine
 	go r.frameReader()
 	return &r
+}
+
+// Close stops the reader's internal goroutines. It is safe to call multiple
+// times. Note: a goroutine blocked inside the underlying io.Reader.Read will
+// not unblock until that read returns (e.g. on timeout or port close).
+func (r *Reader) Close() {
+	r.closeOnce.Do(func() { close(r.stop) })
 }
 
 // Read response

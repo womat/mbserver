@@ -71,9 +71,13 @@ func (r *Reader) frameReader() {
 
 		case <-timeout.C:
 			if len(buffer) > 0 {
-				// inter-frame delay expired → frame complete, forward to dataChan
-				r.data <- buffer
-				// create new buffer for next frame
+				// inter-frame delay expired → frame complete, forward to data chan.
+				// Use select so a concurrent Close() is not blocked by a slow consumer.
+				select {
+				case r.data <- buffer:
+				case <-r.stop:
+					return
+				}
 				buffer = make([]byte, 0, frameSize)
 			}
 		}

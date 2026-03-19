@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -57,9 +58,9 @@ func TestReadCloser(t *testing.T) {
 		fmt.Println("reader created")
 
 		fmt.Println("read thread")
-		closed := false
+		var closed atomic.Bool
 		for {
-			if closed {
+			if closed.Load() {
 				break
 			}
 			rdata := make([]byte, 128)
@@ -72,12 +73,12 @@ func TestReadCloser(t *testing.T) {
 				t.Error("Read error: ", err)
 			}
 			fmt.Println("read count: ", c)
-			if !closed {
+			if !closed.Load() {
 				go func() {
 					time.Sleep(20 * time.Millisecond)
 					fmt.Println("closing read file")
 					reader.Close()
-					closed = true
+					closed.Store(true)
 				}()
 			}
 		}
@@ -339,9 +340,7 @@ func TestReadWriter(t *testing.T) {
 }
 
 type dataSourceReadCloser struct {
-	count     int
-	writeData []byte
-	readData  []byte
+	count int
 }
 
 func (ds *dataSourceReadCloser) Read(data []byte) (int, error) {

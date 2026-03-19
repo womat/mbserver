@@ -20,6 +20,12 @@ func NewReadWriter(iorw io.ReadWriter, timeout time.Duration, interFrameDelay ti
 	}
 }
 
+// Close stops the reader's internal goroutines. The caller is responsible for
+// closing the underlying io.ReadWriter if it implements io.Closer.
+func (rw *ReadWriter) Close() {
+	rw.reader.Close()
+}
+
 // Read response
 func (rw *ReadWriter) Read(buffer []byte) (int, error) {
 	return rw.reader.Read(buffer)

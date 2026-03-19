@@ -1,7 +1,6 @@
 package framereader
 
 import (
-	"errors"
 	"io"
 	"time"
 )
@@ -11,7 +10,6 @@ import (
 type ReadWriteCloser struct {
 	reader *ReadCloser
 	write  func([]byte) (int, error)
-	close  func() error
 }
 
 // NewReadWriteCloser creates a new response reader
@@ -22,11 +20,10 @@ type ReadWriteCloser struct {
 // chunkTimeout is used to specify the max timeout between chunks of data once
 // the response is started. If a delay of chunkTimeout is encountered, the response
 // is considered finished and the Read returns.
-func NewReadWriteCloser(iorw io.ReadWriteCloser, timeout time.Duration, interframedelay time.Duration) *ReadWriteCloser {
+func NewReadWriteCloser(iorw io.ReadWriteCloser, timeout time.Duration, interFrameDelay time.Duration) *ReadWriteCloser {
 	return &ReadWriteCloser{
-		close:  iorw.Close,
 		write:  iorw.Write,
-		reader: NewReadCloser(iorw, timeout, interframedelay),
+		reader: NewReadCloser(iorw, timeout, interFrameDelay),
 	}
 }
 
@@ -37,17 +34,15 @@ func (rwc *ReadWriteCloser) Read(buffer []byte) (int, error) {
 
 // Write flushes all data from reader, and then passes through write call.
 func (rwc *ReadWriteCloser) Write(buffer []byte) (int, error) {
-	n, err := rwc.reader.Flush()
-	if err != nil {
-		return n, err
+	if _, err := rwc.reader.Flush(); err != nil {
+		return 0, err
 	}
 
 	return rwc.write(buffer)
 }
 
-// Close is a passthrough call.
+// Close stops the reader goroutines and closes the underlying resource.
+// Safe to call multiple times.
 func (rwc *ReadWriteCloser) Close() error {
-	err1 := rwc.reader.Close()
-	err2 := rwc.close()
-	return errors.Join(err1, err2)
+	return rwc.reader.Close()
 }

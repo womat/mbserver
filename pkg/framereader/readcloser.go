@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// ReadCloser is a convenience type that implements io.ReadWriter. Write
-// calls flush reader before writing the prompt.
+// ReadCloser is a convenience type that implements io.ReadCloser.
+// Write calls flush reader before writing the prompt.
 type ReadCloser struct {
 	reader *Reader
 	close  func() error
@@ -32,9 +32,10 @@ func (rc *ReadCloser) Read(buffer []byte) (int, error) {
 	return rc.reader.Read(buffer)
 }
 
-// Close is a passthrough call.
+// Close stops the reader goroutines and closes the underlying resource.
+// Safe to call multiple times.
 func (rc *ReadCloser) Close() error {
-	close(rc.reader.stop) // alle Goroutinen stoppen
+	rc.reader.Close()
 	return rc.close()
 }
 
