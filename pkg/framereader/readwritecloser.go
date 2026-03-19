@@ -1,6 +1,7 @@
 package framereader
 
 import (
+	"errors"
 	"io"
 	"time"
 )
@@ -46,6 +47,7 @@ func (rwc *ReadWriteCloser) Write(buffer []byte) (int, error) {
 
 // Close is a passthrough call.
 func (rwc *ReadWriteCloser) Close() error {
-	rwc.reader.Close()
-	return rwc.close()
+	err1 := rwc.reader.Close()
+	err2 := rwc.close()
+	return errors.Join(err1, err2)
 }

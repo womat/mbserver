@@ -1,7 +1,9 @@
 package mbserver
 
 import (
+	"context"
 	"io"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -114,7 +116,13 @@ func TestListenRTU(t *testing.T) {
 	}
 
 	reader := framereader.NewReadWriteCloser(source, time.Second, time.Millisecond*5)
-	serv := NewServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	serv := NewServer(slog.Default())
+	if err := serv.Start(ctx); err != nil {
+		t.Fatalf("failed to start server: %v", err)
+	}
 	serv.NewDevice(3)
 
 	serv.devices[1].HoldingRegisters[1000] = 0x1122
@@ -124,7 +132,7 @@ func TestListenRTU(t *testing.T) {
 	serv.devices[1].HoldingRegisters[2003] = 0x9900
 	serv.devices[3].HoldingRegisters[1000] = 0x1234
 
-	_ = serv.ListenRTU(reader)
+	serv.listenRTUFromReadWriter(ctx, reader)
 
 	time.Sleep(1000 * time.Millisecond)
 
@@ -210,7 +218,13 @@ func TestListenRTU1(t *testing.T) {
 	}
 
 	reader := framereader.NewReadWriteCloser(source, time.Second, time.Millisecond*5)
-	serv := NewServer()
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	defer cancel2()
+
+	serv := NewServer(slog.Default())
+	if err := serv.Start(ctx2); err != nil {
+		t.Fatalf("failed to start server: %v", err)
+	}
 	serv.NewDevice(3)
 
 	serv.devices[1].HoldingRegisters[1000] = 0x1122
@@ -220,7 +234,7 @@ func TestListenRTU1(t *testing.T) {
 	serv.devices[1].HoldingRegisters[2003] = 0x9900
 	serv.devices[3].HoldingRegisters[1000] = 0x1234
 
-	_ = serv.ListenRTU(reader)
+	serv.listenRTUFromReadWriter(ctx2, reader)
 
 	time.Sleep(1 * time.Second)
 

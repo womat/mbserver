@@ -4,12 +4,14 @@
 package mbserver
 
 import (
+	"context"
 	"log"
+	"log/slog"
 	"os/exec"
 	"testing"
 	"time"
 
-	"github.com/womat/mbserver/pkg/framereader"
+	"github.com/goburrow/modbus"
 )
 
 // The serial read and close has a known race condition.
@@ -30,14 +32,20 @@ func TestModbusRTU(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	// Server
-	s := NewServer()
-	err = s.ListenRTU(&framereader.Config{
-		Address:  "ttyFOO",
+	s := NewServer(slog.Default())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if err := s.Start(ctx); err != nil {
+		t.Fatalf("failed to start server: %v", err)
+	}
+	err = s.ListenRTU(ctx, "ttyFOO", SerialConfig{
 		BaudRate: 115200,
 		DataBits: 8,
-		StopBits: 1,
-		Parity:   "N",
-		Timeout:  10 * time.Second})
+		StopBits: OneStopBit,
+		Parity:   NoParity,
+		Timeout:  10 * time.Second,
+	})
 	if err != nil {
 		t.Fatalf("failed to listen, got %v", err)
 	}

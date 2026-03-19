@@ -2,6 +2,7 @@ package mbserver
 
 import (
 	"encoding/json"
+	"log/slog"
 	"testing"
 )
 
@@ -15,7 +16,7 @@ func isEqual(a interface{}, b interface{}) bool {
 // Function 1
 func TestReadCoils(t *testing.T) {
 	const deviceid = 247
-	s := NewServer()
+	s := NewServer(slog.Default())
 	_ = s.NewDevice(deviceid)
 	// Set the coil values
 	s.devices[deviceid].Coils[10] = 1
@@ -33,7 +34,7 @@ func TestReadCoils(t *testing.T) {
 
 	var req Request
 	req.frame = &frame
-	response := s.handle(&req)
+	response := s.handle(req)
 
 	exception := GetException(response)
 	if exception != Success {
@@ -52,7 +53,7 @@ func TestReadCoils(t *testing.T) {
 func TestReadDiscreteInputs(t *testing.T) {
 	const deviceid = 240
 
-	s := NewServer()
+	s := NewServer(slog.Default())
 	_ = s.NewDevice(deviceid)
 	// Set the discrete input values
 	s.devices[deviceid].DiscreteInputs[0] = 1
@@ -70,7 +71,7 @@ func TestReadDiscreteInputs(t *testing.T) {
 
 	var req Request
 	req.frame = &frame
-	response := s.handle(&req)
+	response := s.handle(req)
 
 	exception := GetException(response)
 	if exception != Success {
@@ -87,7 +88,7 @@ func TestReadDiscreteInputs(t *testing.T) {
 // Function 3
 func TestReadHoldingRegisters(t *testing.T) {
 	const deviceid = 240
-	s := NewServer()
+	s := NewServer(slog.Default())
 	_ = s.NewDevice(deviceid)
 
 	s.devices[deviceid].HoldingRegisters[100] = 1
@@ -104,7 +105,7 @@ func TestReadHoldingRegisters(t *testing.T) {
 
 	var req Request
 	req.frame = &frame
-	response := s.handle(&req)
+	response := s.handle(req)
 	exception := GetException(response)
 	if exception != Success {
 		t.Errorf("expected Success, got %v", exception.String())
@@ -119,7 +120,7 @@ func TestReadHoldingRegisters(t *testing.T) {
 
 // Function 4
 func TestReadInputRegisters(t *testing.T) {
-	s := NewServer()
+	s := NewServer(slog.Default())
 
 	s.devices[1].InputRegisters[200] = 1
 	s.devices[1].InputRegisters[201] = 2
@@ -135,7 +136,7 @@ func TestReadInputRegisters(t *testing.T) {
 
 	var req Request
 	req.frame = &frame
-	response := s.handle(&req)
+	response := s.handle(req)
 	exception := GetException(response)
 	if exception != Success {
 		t.Errorf("expected Success, got %v", exception.String())
@@ -150,7 +151,7 @@ func TestReadInputRegisters(t *testing.T) {
 
 // Function 5
 func TestWriteSingleCoil(t *testing.T) {
-	s := NewServer()
+	s := NewServer(slog.Default())
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -158,11 +159,11 @@ func TestWriteSingleCoil(t *testing.T) {
 	frame.Length = 12
 	frame.Device = 1
 	frame.Function = 5
-	SetRegisterData(&frame, 65535, 1024)
+	SetRegisterData(&frame, 65535, 0xFF00)
 
 	var req Request
 	req.frame = &frame
-	response := s.handle(&req)
+	response := s.handle(req)
 	exception := GetException(response)
 	if exception != Success {
 		t.Errorf("expected Success, got %v", exception.String())
@@ -177,7 +178,7 @@ func TestWriteSingleCoil(t *testing.T) {
 
 // Function 6
 func TestWriteHoldingRegister(t *testing.T) {
-	s := NewServer()
+	s := NewServer(slog.Default())
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -189,7 +190,7 @@ func TestWriteHoldingRegister(t *testing.T) {
 
 	var req Request
 	req.frame = &frame
-	response := s.handle(&req)
+	response := s.handle(req)
 	exception := GetException(response)
 	if exception != Success {
 		t.Errorf("expected Success, got %v", exception.String())
@@ -204,7 +205,7 @@ func TestWriteHoldingRegister(t *testing.T) {
 
 // Function 15
 func TestWriteMultipleCoils(t *testing.T) {
-	s := NewServer()
+	s := NewServer(slog.Default())
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -216,7 +217,7 @@ func TestWriteMultipleCoils(t *testing.T) {
 
 	var req Request
 	req.frame = &frame
-	response := s.handle(&req)
+	response := s.handle(req)
 	exception := GetException(response)
 	if exception != Success {
 		t.Errorf("expected Success, got %v", exception.String())
@@ -233,7 +234,7 @@ func TestWriteMultipleCoils(t *testing.T) {
 func TestWriteHoldingRegisters(t *testing.T) {
 	const deviceid = 211
 
-	s := NewServer()
+	s := NewServer(slog.Default())
 	_ = s.NewDevice(deviceid)
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -245,7 +246,7 @@ func TestWriteHoldingRegisters(t *testing.T) {
 
 	var req Request
 	req.frame = &frame
-	response := s.handle(&req)
+	response := s.handle(req)
 	exception := GetException(response)
 	if exception != Success {
 		t.Errorf("expected Success, got %v", exception.String())
@@ -277,7 +278,7 @@ func TestUint16ToBytes(t *testing.T) {
 }
 
 func TestOutOfBounds(t *testing.T) {
-	s := NewServer()
+	s := NewServer(slog.Default())
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
@@ -292,14 +293,14 @@ func TestOutOfBounds(t *testing.T) {
 	SetRegisterData(&frame, 65535, 2)
 
 	frame.Function = 1
-	response := s.handle(&req)
+	response := s.handle(req)
 	exception := GetException(response)
 	if exception != IllegalDataAddress {
 		t.Errorf("expected IllegalDataAddress, got %v", exception.String())
 	}
 
 	frame.Function = 2
-	response = s.handle(&req)
+	response = s.handle(req)
 	exception = GetException(response)
 	if exception != IllegalDataAddress {
 		t.Errorf("expected IllegalDataAddress, got %v", exception.String())
@@ -307,7 +308,7 @@ func TestOutOfBounds(t *testing.T) {
 
 	SetRegisterBytes(&frame, 65535, 2, []byte{3})
 	frame.Function = 15
-	response = s.handle(&req)
+	response = s.handle(req)
 	exception = GetException(response)
 	if exception != IllegalDataAddress {
 		t.Errorf("expected IllegalDataAddress, got %v", exception.String())
@@ -317,14 +318,14 @@ func TestOutOfBounds(t *testing.T) {
 	SetRegisterData(&frame, 65535, 2)
 
 	frame.Function = 3
-	response = s.handle(&req)
+	response = s.handle(req)
 	exception = GetException(response)
 	if exception != IllegalDataAddress {
 		t.Errorf("expected IllegalDataAddress, got %v", exception.String())
 	}
 
 	frame.Function = 4
-	response = s.handle(&req)
+	response = s.handle(req)
 	exception = GetException(response)
 	if exception != IllegalDataAddress {
 		t.Errorf("expected IllegalDataAddress, got %v", exception.String())
@@ -332,7 +333,7 @@ func TestOutOfBounds(t *testing.T) {
 
 	SetRegisterValues(&frame, 65535, 2, []uint16{0, 0})
 	frame.Function = 16
-	response = s.handle(&req)
+	response = s.handle(req)
 	exception = GetException(response)
 	if exception != IllegalDataAddress {
 		t.Errorf("expected IllegalDataAddress, got %v", exception.String())

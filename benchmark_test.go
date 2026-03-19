@@ -1,14 +1,20 @@
 package mbserver
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"log"
+	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/goburrow/modbus"
 )
 
 type serverClient struct {
 	err              error
+	cancel           context.CancelFunc
 	slave            *Server
 	client           modbus.Client
 	clientTCPHandler *modbus.TCPClientHandler
@@ -28,10 +34,20 @@ func getFreePort() string {
 func serverClientSetup() *serverClient {
 	setup := &serverClient{}
 
-	// Server
-	setup.slave = NewServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	setup.cancel = cancel
+
+	setup.slave = NewServer(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err := setup.slave.Start(ctx); err != nil {
+		setup.err = err
+		return setup
+	}
+
 	addr := getFreePort()
-	go setup.slave.ListenTCP(addr)
+	if err := setup.slave.ListenTCP(ctx, addr); err != nil {
+		setup.err = err
+		return setup
+	}
 
 	// Wait for the server to start
 	time.Sleep(1 * time.Millisecond)
@@ -44,7 +60,7 @@ func serverClientSetup() *serverClient {
 	if setup.err != nil {
 		return setup
 	}
-	// Class defer setup.clientTCPHandler.Close() later. If we call here, we will close the co
+	// Call defer setup.clientTCPHandler.Close() later. If we call here, we will close the connection.
 	setup.client = modbus.NewClient(setup.clientTCPHandler)
 
 	return setup
@@ -52,6 +68,7 @@ func serverClientSetup() *serverClient {
 
 func (setup *serverClient) Close() {
 	_ = setup.clientTCPHandler.Close()
+	setup.cancel()
 	setup.slave.Close()
 }
 
@@ -135,12 +152,17 @@ func BenchmarkModbusRead125HoldingRegisters(b *testing.B) {
 	}
 }
 
-// Start a Modbus server and use a client to write to and read from the serer.
+// Start a Modbus server and use a client to write to and read from the server.
 func Example() {
-	// Start the server.
-	serv := NewServer()
-	err := serv.ListenTCP("127.0.0.1:1502")
-	if err != nil {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	serv := NewServer(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err := serv.Start(ctx); err != nil {
+		log.Printf("%v\n", err)
+		return
+	}
+	if err := serv.ListenTCP(ctx, "127.0.0.1:1502"); err != nil {
 		log.Printf("%v\n", err)
 		return
 	}
@@ -151,7 +173,7 @@ func Example() {
 
 	// Connect a client.
 	handler := modbus.NewTCPClientHandler("localhost:1502")
-	err = handler.Connect()
+	err := handler.Connect()
 	if err != nil {
 		log.Printf("%v\n", err)
 		return
@@ -179,14 +201,17 @@ func Example() {
 
 // Override the default ReadDiscreteInputs function.
 func ExampleServer_RegisterFunctionHandler() {
-	serv := NewServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	serv := NewServer(slog.New(slog.NewTextHandler(io.Discard, nil)))
 
 	// Override ReadDiscreteInputs function.
 	serv.RegisterFunctionHandler(2,
 		func(s *Server, frame Framer) ([]byte, Exception) {
 			register, numRegs, endRegister := registerAddressAndNumber(frame)
 			// Check the request is within the allocated memory
-			if endRegister > 65535 {
+			if endRegister > 65536 {
 				return []byte{}, IllegalDataAddress
 			}
 			dataSize := numRegs / 8
@@ -203,9 +228,11 @@ func ExampleServer_RegisterFunctionHandler() {
 			return data, Success
 		})
 
-	// Start the server.
-	err := serv.ListenTCP("localhost:4321")
-	if err != nil {
+	if err := serv.Start(ctx); err != nil {
+		log.Printf("%v\n", err)
+		return
+	}
+	if err := serv.ListenTCP(ctx, "localhost:4321"); err != nil {
 		log.Printf("%v\n", err)
 		return
 	}
@@ -216,7 +243,7 @@ func ExampleServer_RegisterFunctionHandler() {
 
 	// Connect a client.
 	handler := modbus.NewTCPClientHandler("localhost:4321")
-	err = handler.Connect()
+	err := handler.Connect()
 	if err != nil {
 		log.Printf("%v\n", err)
 		return
@@ -236,3 +263,4 @@ func ExampleServer_RegisterFunctionHandler() {
 	// Output:
 	// results [255 255]
 }
+

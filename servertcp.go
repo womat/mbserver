@@ -36,10 +36,17 @@ func (s *Server) ListenTCP(ctx context.Context, addressPort string) (err error) 
 func (s *Server) acceptTCP(ctx context.Context, listen net.Listener) {
 	defer s.wg.Done()
 
+	// done is closed when acceptTCP returns, signalling the cancel-watcher to exit.
+	done := make(chan struct{})
+	defer close(done)
+
 	// Close the listener when ctx is cancelled so Accept() unblocks.
 	go func() {
-		<-ctx.Done()
-		_ = listen.Close()
+		select {
+		case <-ctx.Done():
+			_ = listen.Close()
+		case <-done:
+		}
 	}()
 
 	for {

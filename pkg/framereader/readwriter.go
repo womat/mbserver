@@ -27,9 +27,8 @@ func (rw *ReadWriter) Read(buffer []byte) (int, error) {
 
 // Write flushes all data from reader, and then passes through write call.
 func (rw *ReadWriter) Write(buffer []byte) (int, error) {
-	n, err := rw.reader.Read(buffer)
-	if err != nil {
-		return n, err
+	if _, err := rw.reader.Flush(); err != nil {
+		return 0, err
 	}
 
 	return rw.write(buffer)

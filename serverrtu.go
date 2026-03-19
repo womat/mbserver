@@ -69,6 +69,7 @@ func (s *Server) ListenRTU(ctx context.Context, port string, config SerialConfig
 		return err
 	}
 	if err = p.SetReadTimeout(serial.NoTimeout); err != nil {
+		_ = p.Close()
 		return err
 	}
 
@@ -117,6 +118,21 @@ func (s *Server) acceptSerialRequests(ctx context.Context, reader io.ReadWriteCl
 			s.log.Error("Error parsing RTU frame", "error", err)
 			continue
 		}
-		s.request <- Request{reader, rtuFrame}
+		select {
+		case s.request <- Request{reader, rtuFrame}:
+		case <-ctx.Done():
+			return
+		}
 	}
+}
+
+// listenRTUFromReadWriter starts processing RTU frames from an existing io.ReadWriteCloser.
+// Used for testing or advanced scenarios where the caller manages the serial port.
+func (s *Server) listenRTUFromReadWriter(ctx context.Context, rwc io.ReadWriteCloser) {
+	s.mu.Lock()
+	s.ports = append(s.ports, rwc)
+	s.mu.Unlock()
+
+	s.wg.Add(1)
+	go s.acceptSerialRequests(ctx, rwc)
 }

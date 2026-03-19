@@ -1,7 +1,9 @@
 package mbserver
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -11,7 +13,7 @@ import (
 
 func TestNewDevice(t *testing.T) {
 	const id = 2
-	s := NewServer()
+	s := NewServer(slog.Default())
 	defer s.Close()
 	if err := s.NewDevice(id); err != nil {
 		t.Fatalf("failed to create new device %v: %v\n", id, err)
@@ -20,7 +22,7 @@ func TestNewDevice(t *testing.T) {
 
 func TestNewDevice0(t *testing.T) {
 	const id = 0
-	s := NewServer()
+	s := NewServer(slog.Default())
 	defer s.Close()
 	if err := s.NewDevice(id); err == nil {
 		t.Fatalf("create an unsupported device %v should not be allowed\n", id)
@@ -29,7 +31,7 @@ func TestNewDevice0(t *testing.T) {
 
 func TestNewDevice248(t *testing.T) {
 	const id = idMax + 1
-	s := NewServer()
+	s := NewServer(slog.Default())
 	defer s.Close()
 	if err := s.NewDevice(id); err == nil {
 		t.Fatalf("create an unsupported device %v should not be allowed\n", id)
@@ -38,7 +40,7 @@ func TestNewDevice248(t *testing.T) {
 
 func TestNewDeviceExists(t *testing.T) {
 	const id = 1
-	s := NewServer()
+	s := NewServer(slog.Default())
 	defer s.Close()
 	if err := s.NewDevice(id); err == nil {
 		t.Fatalf("create an existing device %v should not be allowed\n", id)
@@ -68,13 +70,13 @@ func TestAduSetDataWithRegisterAndNumberAndValues(t *testing.T) {
 }
 
 func TestUnsupportedFunction(t *testing.T) {
-	s := NewServer()
+	s := NewServer(slog.Default())
 	var frame TCPFrame
 	frame.Function = 255
 
 	var req Request
 	req.frame = &frame
-	response := s.handle(&req)
+	response := s.handle(req)
 	exception := GetException(response)
 	if exception != IllegalFunction {
 		t.Errorf("expected IllegalFunction (%d), got (%v)", IllegalFunction, exception)
@@ -82,10 +84,16 @@ func TestUnsupportedFunction(t *testing.T) {
 }
 
 func TestModbus(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Server
-	s := NewServer()
+	s := NewServer(slog.Default())
 	_ = s.NewDevice(100)
-	err := s.ListenTCP("127.0.0.1:3333")
+	if err := s.Start(ctx); err != nil {
+		t.Fatalf("failed to start server: %v\n", err)
+	}
+	err := s.ListenTCP(ctx, "127.0.0.1:3333")
 	if err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
 	}
@@ -180,12 +188,18 @@ func TestModbus(t *testing.T) {
 func TestInvalidDeviceId(t *testing.T) {
 	const clients = 4
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Server
-	s := NewServer()
+	s := NewServer(slog.Default())
 	for i := byte(1); i <= clients; i++ {
 		_ = s.NewDevice(i)
 	}
-	if err := s.ListenTCP("127.0.0.1:3333"); err != nil {
+	if err := s.Start(ctx); err != nil {
+		t.Fatalf("failed to start server: %v\n", err)
+	}
+	if err := s.ListenTCP(ctx, "127.0.0.1:3333"); err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
 	}
 	defer s.Close()
@@ -216,12 +230,18 @@ func TestBroadcastWrite(t *testing.T) {
 	const clients = 4
 	data := []byte{0, 3, 0, 4, 0, 5}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Server
-	s := NewServer()
+	s := NewServer(slog.Default())
 	for i := byte(1); i <= clients; i++ {
 		_ = s.NewDevice(i)
 	}
-	if err := s.ListenTCP("127.0.0.1:3333"); err != nil {
+	if err := s.Start(ctx); err != nil {
+		t.Fatalf("failed to start server: %v\n", err)
+	}
+	if err := s.ListenTCP(ctx, "127.0.0.1:3333"); err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
 	}
 	defer s.Close()
@@ -266,12 +286,18 @@ func TestBroadcastWrite(t *testing.T) {
 func TestBroadcastRead(t *testing.T) {
 	const clients = 4
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Server
-	s := NewServer()
+	s := NewServer(slog.Default())
 	for i := byte(1); i <= clients; i++ {
 		_ = s.NewDevice(i)
 	}
-	if err := s.ListenTCP("127.0.0.1:3333"); err != nil {
+	if err := s.Start(ctx); err != nil {
+		t.Fatalf("failed to start server: %v\n", err)
+	}
+	if err := s.ListenTCP(ctx, "127.0.0.1:3333"); err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
 	}
 	defer s.Close()

@@ -22,7 +22,6 @@ const (
 
 // Server is a Modbus slave with allocated memory for discrete inputs, coils, etc.
 type Server struct {
-	// Debug enables more verbose messaging.
 	mu        sync.RWMutex
 	log       *slog.Logger
 	listeners []net.Listener
@@ -34,7 +33,8 @@ type Server struct {
 	connSemaphore chan struct{} // limits concurrent connections
 
 	startOnce sync.Once
-	wg        sync.WaitGroup // tracks active goroutines for clean shutdown
+	cancel    context.CancelFunc // stops the handler goroutine on Close()
+	wg        sync.WaitGroup    // tracks active goroutines for clean shutdown
 	request   chan Request
 }
 
@@ -72,15 +72,17 @@ func NewServer(log *slog.Logger) *Server {
 
 	// Allocate Modbus memory maps.
 	s.devices = map[byte]Device{}
-	_ = s.NewDevice(1)
+	if err := s.NewDevice(1); err != nil {
+		panic("mbserver: failed to create default device: " + err.Error())
+	}
 	return s
 }
 
 func (s *Server) Start(ctx context.Context) error {
-
 	err := ErrAlreadyStarted
 	s.startOnce.Do(func() {
 		err = nil
+		ctx, s.cancel = context.WithCancel(ctx)
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
@@ -111,7 +113,6 @@ func (s *Server) NewDevice(id byte) error {
 	return nil
 }
 
-// TODO Sollte auch nur Close heißen
 func (s *Server) RemoveDevice(id byte) error {
 	if id < idMin || id > idMax {
 		return fmt.Errorf("invalid modbus id %v", id)
@@ -119,7 +120,7 @@ func (s *Server) RemoveDevice(id byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.devices[id]; !ok {
-		return fmt.Errorf("mbserver: device %v doesn't exists", id)
+		return fmt.Errorf("mbserver: device %v doesn't exist", id)
 	}
 	// delete Modbus memory maps.
 	delete(s.devices, id)
@@ -144,7 +145,7 @@ func (s *Server) handle(request Request) Framer {
 		data, exception = s.function[function](s, request.frame)
 		response.SetData(data)
 	} else {
-		s.log.Error("illegal Function", function)
+		s.log.Error("illegal function", "function", function)
 		exception = IllegalFunction
 	}
 
@@ -164,7 +165,6 @@ func (s *Server) handler(ctx context.Context) {
 
 		case request := <-s.request:
 			device := request.frame.GetDevice()
-			// s.mu.RLock()    ← weg
 			if device == 0 {
 				// broadcast
 				s.mu.RLock() // nur für das Lesen der device-Map
@@ -198,10 +198,14 @@ func (s *Server) handler(ctx context.Context) {
 	}
 }
 
-// Close stops listening to TCP/IP ports and closes serial ports.
+// Close stops the server: cancels the handler, closes all listeners and serial
+// ports, then waits for all goroutines to finish.
 func (s *Server) Close() {
-	s.mu.Lock()
+	if s.cancel != nil {
+		s.cancel()
+	}
 
+	s.mu.Lock()
 	for _, listen := range s.listeners {
 		_ = listen.Close()
 	}
