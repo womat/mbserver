@@ -76,6 +76,8 @@ func (r *Reader) frameReader() {
 				select {
 				case r.data <- buffer:
 				case <-r.stop:
+					// timeout.C already consumed by outer case, so no drain needed.
+					timeout.Stop()
 					return
 				}
 				buffer = make([]byte, 0, frameSize)
