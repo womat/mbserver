@@ -63,17 +63,16 @@ func (r *Reader) frameReader() {
 	for {
 		select {
 		case chunk, ok := <-ioData:
-			// Drain timer before resetting so Reset is safe to call.
-			stopTimer(timeout)
 			if !ok {
-				// ioData closed — no more data will arrive.
+				// ioData closed — no more data will arrive; defer stopTimer handles cleanup.
 				return
 			}
+			// Drain timer before resetting so Reset is safe to call.
+			stopTimer(timeout)
 			buffer = append(buffer, chunk...)
 			timeout.Reset(r.interFrameDelay)
 
 		case <-r.stop:
-			// defer stopTimer handles cleanup.
 			return
 
 		case <-timeout.C:
@@ -83,7 +82,6 @@ func (r *Reader) frameReader() {
 				select {
 				case r.data <- buffer:
 				case <-r.stop:
-					// defer stopTimer handles cleanup.
 					return
 				}
 				buffer = make([]byte, 0, frameSize)
