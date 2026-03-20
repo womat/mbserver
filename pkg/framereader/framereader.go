@@ -43,7 +43,8 @@ func (r *Reader) frameReader() {
 			}
 
 			// n=0 without error is valid per io.Reader spec but should never occur on a serial port.
-			// Skip to avoid sending empty slices downstream.
+			// go.bug.st/serial with port.SetReadTimeout(serial.NoTimeout) is a blocking reader,
+			// so a CPU spin from repeated n=0 returns is only theoretical. Skip empty reads.
 			if n > 0 {
 				chunk := make([]byte, n)
 				copy(chunk, ioBuffer[:n])
@@ -64,12 +65,12 @@ func (r *Reader) frameReader() {
 		select {
 		case chunk, ok := <-ioData:
 			if !ok {
-				// ioData closed — no more data will arrive; defer stopTimer handles cleanup.
 				return
 			}
+
+			buffer = append(buffer, chunk...)
 			// Drain timer before resetting so Reset is safe to call.
 			stopTimer(timeout)
-			buffer = append(buffer, chunk...)
 			timeout.Reset(r.interFrameDelay)
 
 		case <-r.stop:
