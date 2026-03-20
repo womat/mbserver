@@ -6,6 +6,17 @@ import (
 	"time"
 )
 
+// stopTimer stops t and drains its channel if it has already fired.
+// Safe to call regardless of whether the channel has already been consumed.
+func stopTimer(t *time.Timer) {
+	if !t.Stop() {
+		select {
+		case <-t.C:
+		default:
+		}
+	}
+}
+
 func (r *Reader) frameReader() {
 	defer func() {
 		close(r.data)
@@ -46,42 +57,38 @@ func (r *Reader) frameReader() {
 	}()
 
 	buffer := make([]byte, 0, frameSize)
+	timeout := time.NewTimer(r.interFrameDelay)
+	defer stopTimer(timeout)
 
-	// reads data from data channel until channel is closed
 	for {
-		timeout := time.NewTimer(r.interFrameDelay)
 		select {
 		case chunk, ok := <-ioData:
-			if !timeout.Stop() {
-				<-timeout.C
-			}
-
+			// Drain timer before resetting so Reset is safe to call.
+			stopTimer(timeout)
 			if !ok {
-				// the channel is closed, no more characters can received
+				// ioData closed — no more data will arrive.
 				return
 			}
-
 			buffer = append(buffer, chunk...)
+			timeout.Reset(r.interFrameDelay)
 
 		case <-r.stop:
-			if !timeout.Stop() {
-				<-timeout.C
-			}
+			// defer stopTimer handles cleanup.
 			return
 
 		case <-timeout.C:
 			if len(buffer) > 0 {
-				// inter-frame delay expired → frame complete, forward to data chan.
+				// Inter-frame delay expired → frame complete, forward to data chan.
 				// Use select so a concurrent Close() is not blocked by a slow consumer.
 				select {
 				case r.data <- buffer:
 				case <-r.stop:
-					// timeout.C already consumed by outer case, so no drain needed.
-					timeout.Stop()
+					// defer stopTimer handles cleanup.
 					return
 				}
 				buffer = make([]byte, 0, frameSize)
 			}
+			timeout.Reset(r.interFrameDelay)
 		}
 	}
 }
