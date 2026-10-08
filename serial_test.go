@@ -235,7 +235,8 @@ func TestInterframeDelay(t *testing.T) {
 }
 
 // TestFrameWithRealByteTiming: at 9600 baud a byte takes about 1.04 ms, so the bytes of one
-// request arrive about a millisecond apart. With t3.5 they must still form one frame.
+// request arrive about a millisecond apart. With t3.5 (about 4 ms) they must still form one
+// frame. A delay computed in the wrong unit (4 µs) splits the request into single bytes.
 func TestFrameWithRealByteTiming(t *testing.T) {
 	client, port := net.Pipe()
 	defer client.Close()
@@ -244,11 +245,21 @@ func TestFrameWithRealByteTiming(t *testing.T) {
 
 	request := RTUFrame{Address: 1, Function: 3}
 	SetRegisterValues(&request, 4096, 2, []uint16{})
+	maxGap := make(chan time.Duration, 1)
 	go func() {
-		for _, b := range request.Bytes() {
+		var longest time.Duration
+		last := time.Now()
+		for i, b := range request.Bytes() {
+			if i > 0 {
+				time.Sleep(time.Millisecond)
+			}
+			if gap := time.Since(last); i > 0 && gap > longest {
+				longest = gap
+			}
+			last = time.Now()
 			_, _ = client.Write([]byte{b})
-			time.Sleep(time.Millisecond)
 		}
+		maxGap <- longest
 	}()
 
 	buffer := make([]byte, 64)
@@ -257,7 +268,22 @@ func TestFrameWithRealByteTiming(t *testing.T) {
 		t.Fatal(err)
 	}
 	if want := len(request.Bytes()); n != want {
-		t.Errorf("got % x (%d bytes), want the whole %d-byte request", buffer[:n], n, want)
+		// Keep reading the rest, so the writer is not blocked on the pipe.
+		go func() {
+			for {
+				if _, err := reader.Read(make([]byte, 64)); err != nil {
+					return
+				}
+			}
+		}()
+		// The test sleeps 1 ms between bytes; on a loaded machine a sleep can exceed t3.5,
+		// and then the split is correct. Compare with the specified t3.5, not with
+		// interframeDelay, or a wrong delay would make the test skip itself.
+		const t35At9600 = 4010416 * time.Nanosecond
+		if gap := <-maxGap; gap >= t35At9600 {
+			t.Skipf("scheduler paused %v between two bytes (t3.5 = %v); cannot test timing here", gap, t35At9600)
+		}
+		t.Fatalf("got % x (%d bytes), want the whole %d-byte request", buffer[:n], n, want)
 	}
 	if _, err = NewRTUFrame(buffer[:n]); err != nil {
 		t.Error(err)
