@@ -40,10 +40,12 @@ func (s *Server) acceptTCP(ctx context.Context, listen net.Listener) {
 	done := make(chan struct{})
 	defer close(done)
 
-	// Close the listener when ctx is cancelled so Accept() unblocks.
+	// Close the listener when ctx is cancelled or the server is closed so Accept() unblocks.
 	go func() {
 		select {
 		case <-ctx.Done():
+			_ = listen.Close()
+		case <-s.done:
 			_ = listen.Close()
 		case <-done:
 		}
@@ -83,6 +85,20 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	}()
 
 	remote := conn.RemoteAddr()
+
+	// Close the connection when ctx is cancelled or the server is closed: a blocked read then
+	// returns and the client learns that this server is gone instead of being served by it.
+	finished := make(chan struct{})
+	defer close(finished)
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-s.done:
+		case <-finished:
+			return
+		}
+		_ = conn.Close()
+	}()
 
 	for {
 		// --- 1. Read the fixed-size MBAP header first ---
@@ -133,6 +149,8 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 		select {
 		case s.request <- Request{conn, frame}:
 		case <-ctx.Done():
+			return
+		case <-s.done:
 			return
 		}
 	}

@@ -2,6 +2,7 @@ package mbserver
 
 import (
 	"context"
+	"errors"
 	"io"
 	"time"
 
@@ -95,13 +96,25 @@ func (s *Server) acceptSerialRequests(ctx context.Context, reader io.ReadWriteCl
 		select {
 		case <-ctx.Done():
 			return
+		case <-s.done:
+			return
 		default:
 		}
 
 		frame := make([]byte, 512)
 		n, err := reader.Read(frame)
+		if errors.Is(err, framereader.ErrTimeout) {
+			// No request within the timeout, e.g. a client that polls rarely or not at
+			// night: keep listening.
+			continue
+		}
 		if err != nil {
-			s.log.Error("Error reading serial port", "error", err)
+			select {
+			case <-s.done: // closed by Close
+			case <-ctx.Done():
+			default:
+				s.log.Error("Error reading serial port, stop serving it", "error", err)
+			}
 			return
 		}
 
@@ -121,6 +134,8 @@ func (s *Server) acceptSerialRequests(ctx context.Context, reader io.ReadWriteCl
 		select {
 		case s.request <- Request{reader, rtuFrame}:
 		case <-ctx.Done():
+			return
+		case <-s.done:
 			return
 		}
 	}

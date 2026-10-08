@@ -1,4 +1,4 @@
-// Package mbserver implements a Modbus server (slave).
+// Package mbserver implements a Modbus server for TCP and RTU with several unit IDs.
 package mbserver
 
 import (
@@ -20,7 +20,7 @@ const (
 	defaultMaxConnections = 100
 )
 
-// Server is a Modbus slave with allocated memory for discrete inputs, coils, etc.
+// Server is a Modbus server with allocated memory for discrete inputs, coils, etc. per unit ID.
 type Server struct {
 	mu        sync.RWMutex
 	log       *slog.Logger
@@ -34,8 +34,11 @@ type Server struct {
 
 	startOnce sync.Once
 	cancel    context.CancelFunc // stops the handler goroutine on Close()
-	wg        sync.WaitGroup    // tracks active goroutines for clean shutdown
+	wg        sync.WaitGroup     // tracks active goroutines for clean shutdown
 	request   chan Request
+
+	done      chan struct{} // closed by Close; stops listeners, connections and serial readers
+	closeOnce sync.Once
 }
 
 // Request contains the connection and Modbus frame.
@@ -52,12 +55,14 @@ type Device struct {
 	InputRegisters   []uint16
 }
 
-// NewServer creates a new Modbus server (slave).
+// NewServer creates a new Modbus server; unit ID 1 exists from the start. Call Start before
+// listening, and Close to stop it.
 func NewServer(log *slog.Logger) *Server {
 	s := &Server{
 		log:           log,
 		request:       make(chan Request),
 		connSemaphore: make(chan struct{}, defaultMaxConnections),
+		done:          make(chan struct{}),
 	}
 
 	// Add default functions.
@@ -125,6 +130,50 @@ func (s *Server) RemoveDevice(id byte) error {
 	// delete Modbus memory maps.
 	delete(s.devices, id)
 	return nil
+}
+
+// ErrRange is returned when a register range does not fit into the 65536 registers of a device.
+var ErrRange = errors.New("mbserver: register range out of bounds")
+
+// SetHoldingRegisters writes values to the holding registers of device id, starting at
+// start, under one lock: a client never reads a partly written multi-register value.
+func (s *Server) SetHoldingRegisters(id byte, start uint16, values []uint16) error {
+	return s.UpdateHoldingRegisters(id, func(registers []uint16) error {
+		if int(start)+len(values) > len(registers) {
+			return ErrRange
+		}
+		copy(registers[start:], values)
+		return nil
+	})
+}
+
+// HoldingRegisters returns a copy of quantity holding registers of device id, starting at start.
+func (s *Server) HoldingRegisters(id byte, start uint16, quantity int) ([]uint16, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	dev, ok := s.devices[id]
+	if !ok {
+		return nil, fmt.Errorf("mbserver: device %v doesn't exist", id)
+	}
+	if quantity < 0 || int(start)+quantity > len(dev.HoldingRegisters) {
+		return nil, ErrRange
+	}
+	return append([]uint16(nil), dev.HoldingRegisters[int(start):int(start)+quantity]...), nil
+}
+
+// UpdateHoldingRegisters calls update with the holding registers of device id while holding
+// the write lock, so several registers can be changed as one consistent update. update must
+// not keep the slice or call other methods of s.
+func (s *Server) UpdateHoldingRegisters(id byte, update func(registers []uint16) error) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	dev, ok := s.devices[id]
+	if !ok {
+		return fmt.Errorf("mbserver: device %v doesn't exist", id)
+	}
+	return update(dev.HoldingRegisters)
 }
 
 // RegisterFunctionHandler override the default behavior for a given Modbus function.
@@ -198,9 +247,12 @@ func (s *Server) handler(ctx context.Context) {
 	}
 }
 
-// Close stops the server: cancels the handler, closes all listeners and serial
-// ports, then waits for all goroutines to finish.
+// Close stops the server: cancels the handler, closes all listeners, client connections and
+// serial ports, then waits for all goroutines to finish. Clients still connected are
+// disconnected, so they reconnect to whatever serves the address next. Safe to call more
+// than once.
 func (s *Server) Close() {
+	s.closeOnce.Do(func() { close(s.done) })
 	if s.cancel != nil {
 		s.cancel()
 	}

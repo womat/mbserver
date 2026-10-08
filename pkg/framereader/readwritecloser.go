@@ -15,7 +15,7 @@ type ReadWriteCloser struct {
 // NewReadWriteCloser creates a new response reader
 //
 // timeout is used to specify an
-// overall timeout. If this timeout is encountered, io.EOF is returned.
+// overall timeout. If this timeout is encountered, ErrTimeout is returned.
 //
 // chunkTimeout is used to specify the max timeout between chunks of data once
 // the response is started. If a delay of chunkTimeout is encountered, the response

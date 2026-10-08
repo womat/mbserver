@@ -1,6 +1,7 @@
 package framereader
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -251,7 +252,7 @@ func TestResponseReaderTimeout(t *testing.T) {
 
 	dur := time.Since(start)
 
-	if err != io.EOF {
+	if !errors.Is(err, ErrTimeout) {
 		t.Error("expected timeout error, got: ", err)
 	}
 
@@ -313,7 +314,7 @@ func TestReadWriter(t *testing.T) {
 
 	dur := time.Since(start)
 
-	if err != io.EOF {
+	if !errors.Is(err, ErrTimeout) {
 		t.Error("expected timeout error: ", err)
 	}
 

@@ -29,10 +29,15 @@ type Reader struct {
 
 var ErrZeroBuffer = errors.New("must supply non-zero length buffer")
 
+// ErrTimeout is returned by Read when no data arrived within the overall timeout. Unlike
+// io.EOF it does not mean the source is gone: the next Read may well return data.
+var ErrTimeout = errors.New("framereader: timeout")
+
 // NewReader creates a new response reader.
 //
 // timeout is used to specify an
-// overall timeout. If this timeout is encountered, io.EOF is returned.
+// overall timeout. If this timeout is encountered, ErrTimeout is returned.
+// io.EOF is returned once the reader is closed or the source stopped.
 //
 // chunkTimeout is used to specify the max timeout between chunks of data once
 // the response is started. If a delay of chunkTimeout is encountered, the response
@@ -81,7 +86,7 @@ func (r *Reader) Read(buffer []byte) (int, error) {
 		return 0, io.EOF
 
 	case <-timeout.C:
-		return 0, io.EOF
+		return 0, ErrTimeout
 	}
 }
 
