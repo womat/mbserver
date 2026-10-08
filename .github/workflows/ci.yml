@@ -24,6 +24,10 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      # TestModbusRTU serves RTU over a pair of virtual serial ports created by socat.
+      - name: Install socat
+        run: sudo apt-get install -y --no-install-recommends socat
+
       - name: Vet
         run: go vet ./...
 

@@ -5,31 +5,46 @@ package mbserver
 
 import (
 	"context"
-	"log"
 	"log/slog"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/goburrow/modbus"
 )
 
-// The serial read and close has a known race condition.
-// https://github.com/golang/go/issues/10001
+// TestModbusRTU serves RTU over a pair of virtual serial ports (socat ptys), through the
+// real serial and frame reader stack. It is skipped where socat is not installed.
 func TestModbusRTU(t *testing.T) {
+	if _, err := exec.LookPath("socat"); err != nil {
+		t.Skip("socat not installed")
+	}
+
 	// Create a pair of virtual serial devices.
-	cmd := exec.Command("socat",
-		"pty,raw,echo=0,link=ttyFOO",
-		"pty,raw,echo=0,link=ttyBAR")
-	err := cmd.Start()
-	if err != nil {
-		log.Fatal(err)
+	dir := t.TempDir()
+	foo, bar := filepath.Join(dir, "ttyFOO"), filepath.Join(dir, "ttyBAR")
+	cmd := exec.Command("socat", "pty,raw,echo=0,link="+foo, "pty,raw,echo=0,link="+bar)
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
 	}
 	defer cmd.Wait()
 	defer cmd.Process.Kill()
 
-	// Allow the virtual serial devices to be created.
-	time.Sleep(10 * time.Millisecond)
+	// Wait for the virtual serial devices to be created.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		_, errFoo := os.Stat(foo)
+		_, errBar := os.Stat(bar)
+		if errFoo == nil && errBar == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("socat did not create the virtual serial ports")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 
 	// Server
 	s := NewServer(slog.Default())
@@ -39,7 +54,7 @@ func TestModbusRTU(t *testing.T) {
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("failed to start server: %v", err)
 	}
-	err = s.ListenRTU(ctx, "ttyFOO", SerialConfig{
+	err := s.ListenRTU(ctx, foo, SerialConfig{
 		BaudRate: 115200,
 		DataBits: 8,
 		StopBits: OneStopBit,
@@ -55,7 +70,7 @@ func TestModbusRTU(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	// Client
-	handler := modbus.NewRTUClientHandler("ttyBAR")
+	handler := modbus.NewRTUClientHandler(bar)
 	handler.BaudRate = 115200
 	handler.DataBits = 8
 	handler.Parity = "N"
