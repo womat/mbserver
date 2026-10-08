@@ -22,6 +22,10 @@ production by [smartmeter](https://github.com/womat/smartmeter), a Fronius Smart
 - **Several unit IDs**, each with 65536 coils, discrete inputs, holding and input registers
 - **Consistent updates**: `UpdateHoldingRegisters` changes several registers under one lock, so a
   client never reads a 32-bit value with one new and one old word
+- **Offline unit IDs**: `SetOnline(id, false)` makes a unit ID go silent while it keeps its
+  registers, e.g. for a gateway whose source is lost
+- **Activity counters**: `Stats` reports the answered requests per transport and the connected
+  TCP clients
 - **Clean shutdown**: `Close` stops listeners, disconnects TCP clients and closes serial ports
 - **Customizable** function handlers, e.g. a read-only server
 - Logging via `log/slog`; no cgo, runs on Linux, macOS and Windows (serial via
@@ -94,6 +98,7 @@ func main() {
 | `SetHoldingRegisters(id, start, values)` | write consecutive holding registers under one lock                 |
 | `HoldingRegisters(id, start, quantity)`  | copy of holding registers                                          |
 | `UpdateHoldingRegisters(id, func)`       | change any holding registers of a unit ID as one consistent update |
+| `SetOnline(id, online)` / `Online(id)`   | take a unit ID off the bus and back, keeping its registers         |
 
 ```go
 // Several registers as one update: a client reads either all old or all new values.
@@ -103,6 +108,25 @@ err := s.UpdateHoldingRegisters(1, func(r []uint16) error {
 	return nil
 })
 ```
+
+An offline unit ID is answered like an unknown one (see [Behavior](#behavior)); its registers can
+still be written, so it comes back with current values and no moment of empty registers:
+
+```go
+_ = s.SetOnline(1, false) // the source is lost: let the client see a failed device
+// ... later, with fresh values written:
+_ = s.SetOnline(1, true)
+```
+
+### Activity
+
+```go
+st := s.Stats() // st.TCPRequests, st.RTURequests, st.TCPClients
+```
+
+`TCPRequests` and `RTURequests` count the requests answered since `NewServer`, exceptions included;
+requests for unknown or offline unit IDs and broadcasts are not counted. Poll them and take the
+difference to show activity.
 
 ### Function codes
 
@@ -142,7 +166,7 @@ be opened at all, so a wrong device name shows up at start.
 
 - **Requests are processed one after the other**, in the order they arrive, across all
   connections and serial ports.
-- **Unknown unit IDs**: over TCP the server answers with exception 11
+- **Unknown and offline unit IDs**: over TCP the server answers with exception 11
   (`GatewayTargetDeviceFailedToRespond`), so the client does not run into its timeout. On a serial
   bus it stays silent, because another device may own that unit ID.
 - **Broadcasts** (unit ID 0) are applied to every unit ID and not answered, as specified.

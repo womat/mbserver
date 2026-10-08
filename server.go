@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -32,6 +33,7 @@ type Server struct {
 	reopenInterval time.Duration
 	function       [256]func(*Server, Framer) ([]byte, Exception)
 	devices        map[byte]Device
+	offline        map[byte]bool // unit IDs that keep their registers but do not answer, see SetOnline
 
 	connSemaphore chan struct{} // limits concurrent connections
 
@@ -42,6 +44,9 @@ type Server struct {
 
 	done      chan struct{} // closed by Close; stops listeners, connections and serial readers
 	closeOnce sync.Once
+
+	tcpRequests atomic.Uint64 // requests answered over TCP, see Stats
+	rtuRequests atomic.Uint64 // requests answered over RTU, see Stats
 }
 
 // Request contains the connection and Modbus frame.
@@ -83,6 +88,7 @@ func NewServer(log *slog.Logger) *Server {
 
 	// Allocate Modbus memory maps.
 	s.devices = map[byte]Device{}
+	s.offline = map[byte]bool{}
 	if err := s.NewDevice(1); err != nil {
 		panic("mbserver: failed to create default device: " + err.Error())
 	}
@@ -135,6 +141,7 @@ func (s *Server) RemoveDevice(id byte) error {
 	}
 	// delete Modbus memory maps.
 	delete(s.devices, id)
+	delete(s.offline, id)
 	return nil
 }
 
@@ -183,6 +190,51 @@ func (s *Server) UpdateHoldingRegisters(id byte, update func(registers []uint16)
 }
 
 // RegisterFunctionHandler override the default behavior for a given Modbus function.
+// SetOnline takes a unit ID off the bus (online false) or back on it (online true). An offline
+// unit is answered like an unknown one - silence over RTU, exception GatewayTargetDeviceFailedToRespond
+// over TCP - but keeps its registers, and SetHoldingRegisters and UpdateHoldingRegisters still
+// work. So a gateway can go silent while its source is lost, and come back with fresh values
+// without a moment of empty registers.
+func (s *Server) SetOnline(id byte, online bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.devices[id]; !ok {
+		return fmt.Errorf("mbserver: device %v doesn't exist", id)
+	}
+	if online {
+		delete(s.offline, id)
+	} else {
+		s.offline[id] = true
+	}
+	return nil
+}
+
+// Online reports whether the unit ID exists and is online.
+func (s *Server) Online(id byte) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.devices[id]
+	return ok && !s.offline[id]
+}
+
+// Stats is a snapshot of the server's activity since NewServer.
+type Stats struct {
+	TCPRequests uint64 // requests answered over TCP, exceptions included
+	RTURequests uint64 // requests answered over RTU, exceptions included
+	TCPClients  int    // TCP connections open right now
+}
+
+// Stats returns the request counters and the number of connected TCP clients. Requests for
+// unknown or offline unit IDs and broadcasts are not counted. A client polls the counters and
+// takes the difference to show activity.
+func (s *Server) Stats() Stats {
+	return Stats{
+		TCPRequests: s.tcpRequests.Load(),
+		RTURequests: s.rtuRequests.Load(),
+		TCPClients:  len(s.connSemaphore),
+	}
+}
+
 func (s *Server) RegisterFunctionHandler(funcCode uint8, function func(*Server, Framer) ([]byte, Exception)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -238,13 +290,15 @@ func (s *Server) handler(ctx context.Context) {
 
 			s.mu.RLock()
 			_, ok := s.devices[device]
+			ok = ok && !s.offline[device]
 			s.mu.RUnlock()
 
+			_, isTCP := request.frame.(*TCPFrame)
 			if !ok {
 				// On a serial bus another device may own the unit ID, so stay silent. Over TCP
 				// there is nobody else to answer: report it, so the client does not time out.
-				if _, isTCP := request.frame.(*TCPFrame); isTCP {
-					s.log.Debug("request for an unknown unit ID", "device", device)
+				if isTCP {
+					s.log.Debug("request for an unknown or offline unit ID", "device", device)
 					response := request.frame.Copy()
 					response.SetException(GatewayTargetDeviceFailedToRespond)
 					if _, err := request.conn.Write(response.Bytes()); err != nil {
@@ -257,6 +311,12 @@ func (s *Server) handler(ctx context.Context) {
 			response := s.handle(request) // handle() → ReadCoils etc. → eigener Lock
 			if _, err := request.conn.Write(response.Bytes()); err != nil {
 				s.log.Warn("failed to write response", "error", err)
+				continue
+			}
+			if isTCP {
+				s.tcpRequests.Add(1)
+			} else {
+				s.rtuRequests.Add(1)
 			}
 		}
 	}
