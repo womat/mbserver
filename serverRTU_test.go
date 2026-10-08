@@ -57,7 +57,9 @@ func (ds *dataSource) Read(data []byte) (int, error) {
 }
 
 func (ds *dataSource) Write(data []byte) (int, error) {
-	testSequenz.frames[testSequenz.sequenz].got = data[:]
+	testSequenzMu.Lock()
+	defer testSequenzMu.Unlock()
+	testSequenz.frames[testSequenz.sequenz].got = append([]byte(nil), data...)
 	testSequenz.sequenz++
 	return len(data), nil
 }
@@ -78,7 +80,25 @@ type testsequenz = struct {
 	frames  []testFrame
 }
 
-var testSequenz testsequenz
+var (
+	testSequenz   testsequenz
+	testSequenzMu sync.Mutex
+)
+
+// waitForResponses waits until the server has written a response to every test frame.
+func waitForResponses(t *testing.T) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		testSequenzMu.Lock()
+		done := testSequenz.sequenz >= len(testSequenz.frames)
+		testSequenzMu.Unlock()
+		if done || time.Now().After(deadline) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
 
 func TestListenRTU(t *testing.T) {
 	testSequenz = testsequenz{sequenz: 0, frames: []testFrame{}}
@@ -107,21 +127,21 @@ func TestListenRTU(t *testing.T) {
 			},
 			{
 				data:           testSequenz.frames[1].frame,
-				framedelay:     10 * time.Millisecond,
+				framedelay:     40 * time.Millisecond,
 				characterdelay: 1 * time.Millisecond,
 			}, {
 				data:           testSequenz.frames[2].frame,
-				framedelay:     10 * time.Millisecond,
+				framedelay:     40 * time.Millisecond,
 				characterdelay: 2 * time.Millisecond,
 			}, {
 				data:           testSequenz.frames[3].frame,
-				framedelay:     10 * time.Millisecond,
+				framedelay:     40 * time.Millisecond,
 				characterdelay: 1 * time.Millisecond,
 			},
 		},
 	}
 
-	reader := framereader.NewReadWriteCloser(source, time.Second, time.Millisecond*5)
+	reader := framereader.NewReadWriteCloser(source, time.Second, 20*time.Millisecond)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	serv := NewServer(slog.Default())
@@ -140,7 +160,7 @@ func TestListenRTU(t *testing.T) {
 
 	serv.listenRTUFromReadWriter(ctx, reader)
 
-	time.Sleep(1000 * time.Millisecond)
+	waitForResponses(t)
 
 	// Cancel and wait for all goroutines to stop before checking results
 	// (prevents race with next test that resets testSequenz).
@@ -191,7 +211,7 @@ func TestListenRTU1(t *testing.T) {
 			// Frame 1
 			{
 				data:           testSequenz.frames[1].frame[:2],
-				framedelay:     10 * time.Millisecond,
+				framedelay:     40 * time.Millisecond,
 				characterdelay: 2 * time.Millisecond,
 			},
 			{
@@ -206,13 +226,13 @@ func TestListenRTU1(t *testing.T) {
 			// Frame 3
 			{
 				data:           testSequenz.frames[2].frame,
-				framedelay:     10 * time.Millisecond,
+				framedelay:     40 * time.Millisecond,
 				characterdelay: 1 * time.Millisecond,
 			},
 			//Frame 4
 			{
 				data:           testSequenz.frames[3].frame[:3],
-				framedelay:     10 * time.Millisecond,
+				framedelay:     40 * time.Millisecond,
 				characterdelay: 0,
 			},
 			{
@@ -223,13 +243,13 @@ func TestListenRTU1(t *testing.T) {
 			//Frame 5
 			{
 				data:           testSequenz.frames[4].frame,
-				framedelay:     10 * time.Millisecond,
+				framedelay:     40 * time.Millisecond,
 				characterdelay: 0 * time.Millisecond,
 			},
 		},
 	}
 
-	reader := framereader.NewReadWriteCloser(source, time.Second, time.Millisecond*5)
+	reader := framereader.NewReadWriteCloser(source, time.Second, 20*time.Millisecond)
 	ctx2, cancel2 := context.WithCancel(context.Background())
 
 	serv := NewServer(slog.Default())
@@ -248,7 +268,7 @@ func TestListenRTU1(t *testing.T) {
 
 	serv.listenRTUFromReadWriter(ctx2, reader)
 
-	time.Sleep(1 * time.Second)
+	waitForResponses(t)
 
 	cancel2()
 	serv.Close()
