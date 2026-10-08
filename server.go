@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 )
 
 var (
@@ -26,9 +27,11 @@ type Server struct {
 	log       *slog.Logger
 	listeners []net.Listener
 
-	ports    []io.ReadWriteCloser
-	function [256]func(*Server, Framer) ([]byte, Exception)
-	devices  map[byte]Device
+	serialPorts    []*serialPort
+	openSerial     func(port string, config SerialConfig) (io.ReadWriteCloser, error)
+	reopenInterval time.Duration
+	function       [256]func(*Server, Framer) ([]byte, Exception)
+	devices        map[byte]Device
 
 	connSemaphore chan struct{} // limits concurrent connections
 
@@ -63,6 +66,9 @@ func NewServer(log *slog.Logger) *Server {
 		request:       make(chan Request),
 		connSemaphore: make(chan struct{}, defaultMaxConnections),
 		done:          make(chan struct{}),
+
+		openSerial:     openSerialPort,
+		reopenInterval: defaultReopenInterval,
 	}
 
 	// Add default functions.
@@ -194,7 +200,7 @@ func (s *Server) handle(request Request) Framer {
 		data, exception = s.function[function](s, request.frame)
 		response.SetData(data)
 	} else {
-		s.log.Error("illegal function", "function", function)
+		s.log.Debug("illegal function", "function", function)
 		exception = IllegalFunction
 	}
 
@@ -235,7 +241,16 @@ func (s *Server) handler(ctx context.Context) {
 			s.mu.RUnlock()
 
 			if !ok {
-				s.log.Warn("modbus device doesn't exists", "device", device)
+				// On a serial bus another device may own the unit ID, so stay silent. Over TCP
+				// there is nobody else to answer: report it, so the client does not time out.
+				if _, isTCP := request.frame.(*TCPFrame); isTCP {
+					s.log.Debug("request for an unknown unit ID", "device", device)
+					response := request.frame.Copy()
+					response.SetException(GatewayTargetDeviceFailedToRespond)
+					if _, err := request.conn.Write(response.Bytes()); err != nil {
+						s.log.Warn("failed to write response", "error", err)
+					}
+				}
 				continue
 			}
 
@@ -261,8 +276,8 @@ func (s *Server) Close() {
 	for _, listen := range s.listeners {
 		_ = listen.Close()
 	}
-	for _, port := range s.ports {
-		_ = port.Close()
+	for _, port := range s.serialPorts {
+		port.close()
 	}
 	s.mu.Unlock()
 

@@ -15,7 +15,7 @@ import (
 type serverClient struct {
 	err              error
 	cancel           context.CancelFunc
-	slave            *Server
+	server           *Server
 	client           modbus.Client
 	clientTCPHandler *modbus.TCPClientHandler
 }
@@ -37,14 +37,14 @@ func serverClientSetup() *serverClient {
 	ctx, cancel := context.WithCancel(context.Background())
 	setup.cancel = cancel
 
-	setup.slave = NewServer(slog.New(slog.NewTextHandler(io.Discard, nil)))
-	if err := setup.slave.Start(ctx); err != nil {
+	setup.server = NewServer(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err := setup.server.Start(ctx); err != nil {
 		setup.err = err
 		return setup
 	}
 
 	addr := getFreePort()
-	if err := setup.slave.ListenTCP(ctx, addr); err != nil {
+	if err := setup.server.ListenTCP(ctx, addr); err != nil {
 		setup.err = err
 		return setup
 	}
@@ -69,7 +69,7 @@ func serverClientSetup() *serverClient {
 func (setup *serverClient) Close() {
 	_ = setup.clientTCPHandler.Close()
 	setup.cancel()
-	setup.slave.Close()
+	setup.server.Close()
 }
 
 func BenchmarkModbusWrite1968MultipleCoils(b *testing.B) {
@@ -263,4 +263,3 @@ func ExampleServer_RegisterFunctionHandler() {
 	// Output:
 	// results [255 255]
 }
-

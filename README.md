@@ -1,16 +1,110 @@
-# Golang Modbus Server
+# mbserver
 
-A Modbus server for Modbus TCP and Modbus RTU (serial), originally forked from
-[tbrandon/mbserver](https://github.com/tbrandon/mbserver), with:
+**A Modbus TCP and RTU server for Go: several unit IDs, consistent register updates, and a serial
+line that survives an unplugged adapter.**
 
-- several unit IDs (devices), each with its own register memory
-- Modbus RTU with frame detection by the t3.5 inter-frame delay (`pkg/framereader`)
-- Modbus TCP with proper MBAP framing and a limit of concurrent connections
-- register access under one lock: a client never reads a partly written multi-register value
-- a clean `Close`: listeners, client connections and serial ports are closed, all goroutines end
-- logging via `log/slog`
+[![CI](https://github.com/womat/mbserver/actions/workflows/ci.yml/badge.svg)](https://github.com/womat/mbserver/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/womat/mbserver.svg)](https://pkg.go.dev/github.com/womat/mbserver)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-The server answers these function codes:
+mbserver lets a Go program answer Modbus requests from PLCs, inverters, energy managers or SCADA
+clients — for example to emulate a meter or to expose values that live elsewhere. It keeps a
+register memory per unit ID that the program updates while clients read it.
+
+It started as a fork of [tbrandon/mbserver](https://github.com/tbrandon/mbserver) and is used in
+production by [smartmeter](https://github.com/womat/smartmeter), a Fronius Smart Meter emulator.
+
+## Features
+
+- **Modbus TCP** with proper MBAP framing, several requests per connection, at most 100 clients
+- **Modbus RTU** on a serial port: a request ends after the t3.5 silent interval (or a configured
+  delay); the port is **reopened automatically** after a failure, e.g. an unplugged USB adapter
+- **Several unit IDs**, each with 65536 coils, discrete inputs, holding and input registers
+- **Consistent updates**: `UpdateHoldingRegisters` changes several registers under one lock, so a
+  client never reads a 32-bit value with one new and one old word
+- **Clean shutdown**: `Close` stops listeners, disconnects TCP clients and closes serial ports
+- **Customizable** function handlers, e.g. a read-only server
+- Logging via `log/slog`; no cgo, runs on Linux, macOS and Windows (serial via
+  [go.bug.st/serial](https://github.com/bugst/go-serial))
+
+## Install
+
+```sh
+go get github.com/womat/mbserver@latest
+```
+
+Requires Go 1.27 or later.
+
+## Usage
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"log/slog"
+	"os/signal"
+	"syscall"
+
+	"github.com/womat/mbserver"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	s := mbserver.NewServer(slog.Default()) // unit ID 1 exists from the start
+	if err := s.Start(ctx); err != nil {
+		log.Fatal(err)
+	}
+	defer s.Close()
+
+	if err := s.NewDevice(200); err != nil {
+		log.Fatal(err)
+	}
+
+	// Modbus TCP; port 502 needs root or CAP_NET_BIND_SERVICE
+	if err := s.ListenTCP(ctx, "0.0.0.0:1502"); err != nil {
+		log.Fatal(err)
+	}
+
+	// Modbus RTU
+	if err := s.ListenRTU(ctx, "/dev/ttyUSB0", mbserver.SerialConfig{
+		BaudRate: 9600,
+		DataBits: 8,
+		StopBits: mbserver.OneStopBit,
+		Parity:   mbserver.NoParity,
+	}); err != nil {
+		log.Fatal(err)
+	}
+
+	// Publish a value while clients are reading
+	_ = s.SetHoldingRegisters(200, 4124, []uint16{0x03F6, 0xFAFA})
+
+	<-ctx.Done()
+}
+```
+
+### Registers
+
+| Method                                   | Description                                                        |
+|------------------------------------------|--------------------------------------------------------------------|
+| `NewDevice(id)` / `RemoveDevice(id)`     | add or remove a unit ID (1–247)                                    |
+| `SetHoldingRegisters(id, start, values)` | write consecutive holding registers under one lock                 |
+| `HoldingRegisters(id, start, quantity)`  | copy of holding registers                                          |
+| `UpdateHoldingRegisters(id, func)`       | change any holding registers of a unit ID as one consistent update |
+
+```go
+// Several registers as one update: a client reads either all old or all new values.
+err := s.UpdateHoldingRegisters(1, func(r []uint16) error {
+	r[4096], r[4097] = 0x0003, 0x7EEC // 229100 as uint32, high word first
+	r[4134] = 500
+	return nil
+})
+```
+
+### Function codes
 
 | Code | Function                         |
 |------|----------------------------------|
@@ -23,58 +117,8 @@ The server answers these function codes:
 | 15   | Write Multiple Coils             |
 | 16   | Write Multiple Holding Registers |
 
-Every unit ID has 65536 coils, discrete inputs, holding registers and input registers, all zero at
-the start. Unit ID 1 exists from the start; add more with `NewDevice`. Requests are processed one
-after the other, in the order they arrive.
-
-## Usage
-
-```go
-ctx, cancel := context.WithCancel(context.Background())
-defer cancel()
-
-s := mbserver.NewServer(slog.Default())
-if err := s.Start(ctx); err != nil {
-	log.Fatal(err)
-}
-defer s.Close()
-
-if err := s.NewDevice(200); err != nil {
-	log.Fatal(err)
-}
-
-// Modbus TCP
-if err := s.ListenTCP(ctx, "0.0.0.0:1502"); err != nil {
-	log.Fatal(err)
-}
-
-// Modbus RTU
-if err := s.ListenRTU(ctx, "/dev/ttyUSB0", mbserver.SerialConfig{
-	BaudRate: 9600,
-	DataBits: 8,
-	StopBits: mbserver.OneStopBit,
-	Parity:   mbserver.NoParity,
-	Timeout:  5 * time.Second, // read timeout; the server keeps listening after it
-}); err != nil {
-	log.Fatal(err)
-}
-
-// Update registers while clients are reading them
-_ = s.SetHoldingRegisters(200, 4124, []uint16{0x03F6, 0xFAFA})
-
-// Several registers as one consistent update
-_ = s.UpdateHoldingRegisters(1, func(r []uint16) error {
-	r[4096], r[4097] = 0x0003, 0x7EEC
-	return nil
-})
-```
-
-Modbus usually uses port 502, which needs special permissions (e.g. `CAP_NET_BIND_SERVICE`).
-
-## Server customization
-
-`RegisterFunctionHandler` overrides the default behavior for a function code; `nil` disables it,
-the server then answers with `IllegalFunction`. A read-only server, for example:
+`RegisterFunctionHandler` replaces the handler of a function code; `nil` disables it, the server then
+answers with `IllegalFunction`. A read-only server:
 
 ```go
 for _, code := range []uint8{5, 6, 15, 16} {
@@ -82,8 +126,68 @@ for _, code := range []uint8{5, 6, 15, 16} {
 }
 ```
 
-## Benchmarks
+### Serial line state
+
+```go
+for _, st := range s.SerialStatus() {
+	fmt.Println(st.Port, st.Connected, st.Err, st.Since)
+}
+```
+
+After a read error the server logs it, reports the port as not connected and tries to reopen it
+every 5 seconds until it succeeds or `Close` is called. `ListenRTU` itself fails if the port cannot
+be opened at all, so a wrong device name shows up at start.
+
+## Behavior
+
+- **Requests are processed one after the other**, in the order they arrive, across all
+  connections and serial ports.
+- **Unknown unit IDs**: over TCP the server answers with exception 11
+  (`GatewayTargetDeviceFailedToRespond`), so the client does not run into its timeout. On a serial
+  bus it stays silent, because another device may own that unit ID.
+- **Broadcasts** (unit ID 0) are applied to every unit ID and not answered, as specified.
+- **RTU framing**: a request ends after the silent interval t3.5 — about 4 ms at 9600 baud, 1.75 ms
+  above 19200 baud. USB-RS485 adapters deliver bytes in packets with gaps of several milliseconds;
+  if requests arrive split (CRC errors in the log), set `SerialConfig.InterFrameDelay`, e.g. to
+  20–40 ms.
+- **Read timeout** (`SerialConfig.Timeout`, 5 s by default): only bounds a single read; a client
+  that is silent for longer is still answered afterwards.
+- **`Close`** disconnects TCP clients, so after a restart nobody keeps being served by the old
+  instance. It may be called more than once.
+
+## Exceptions
+
+The exception codes follow the Modbus Application Protocol Specification V1.1b3:
+`IllegalFunction` (1), `IllegalDataAddress` (2), `IllegalDataValue` (3), `ServerDeviceFailure` (4),
+`Acknowledge` (5), `ServerDeviceBusy` (6), `NegativeAcknowledge` (7), `MemoryParityError` (8),
+`GatewayPathUnavailable` (10), `GatewayTargetDeviceFailedToRespond` (11).
+
+## Upgrading from v0.0.x
+
+v0.1.0 changes the API:
+
+| v0.0.x                                  | v0.1.0                                                       |
+|-----------------------------------------|--------------------------------------------------------------|
+| `NewServer()`                           | `NewServer(logger)`, then `Start(ctx)`                       |
+| `ListenTCP(address)`                    | `ListenTCP(ctx, address)`                                    |
+| `ListenRTU(port io.ReadWriteCloser)`    | `ListenRTU(ctx, name, SerialConfig)` — the server opens the port |
+| `s.Devices[id].HoldingRegisters[i] = v` | `SetHoldingRegisters` / `UpdateHoldingRegisters`             |
+| `SlaveDeviceFailure`, `SlaveDeviceBusy`, `AcknowledgeSlave` | `ServerDeviceFailure`, `ServerDeviceBusy`, `Acknowledge` |
+| `SetDebug(...)`                         | pass a `*slog.Logger` to `NewServer`                         |
+
+## Development
 
 ```sh
-go test -bench=.
+go vet ./...
+go test -race ./...
+go test -bench=.      # TCP read/write benchmarks
 ```
+
+`TestSerialHW` runs against a real adapter on `/dev/ttyUSB0` and is skipped without one; all
+other tests use in-memory pipes and local TCP ports.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Based on [tbrandon/mbserver](https://github.com/tbrandon/mbserver)
+(MIT, © 2017 Tyler Brandon). The CRC table is derived from
+[libcrc](https://github.com/lammertb/libcrc) (MIT, © 1999-2016 Lammert Bies).

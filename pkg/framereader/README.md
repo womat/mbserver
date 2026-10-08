@@ -1,34 +1,24 @@
-# serial [![Build Status](https://travis-ci.org/goburrow/serial.svg?branch=master)](https://travis-ci.org/goburrow/serial) [![GoDoc](https://godoc.org/github.com/goburrow/serial?status.svg)](https://godoc.org/github.com/goburrow/serial)
-## Example
+# framereader
+
+Package `framereader` turns a byte stream into frames separated by silence, as Modbus RTU and
+similar serial protocols need: a frame ends when no byte arrived for the inter-frame delay.
+
 ```go
-package main
+port, _ := serial.Open("/dev/ttyUSB0", &serial.Mode{BaudRate: 9600})
+rw := framereader.NewReadWriteCloser(port, 5*time.Second, 4*time.Millisecond)
 
-import (
-	"log"
-
-	"github.com/goburrow/serial"
-)
-
-func main() {
-	port, err := serial.Open(&serial.Config{Address: "/dev/ttyUSB0"})
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer port.Close()
-
-	_, err = port.Write([]byte("serial"))
-	if err != nil {
-		log.Fatal(err)
-	}
+buf := make([]byte, 256)
+n, err := rw.Read(buf) // one complete frame
+switch {
+case errors.Is(err, framereader.ErrTimeout): // nothing arrived within 5 s; read again
+case err != nil: // io.EOF: closed, or the source failed
 }
+_, _ = rw.Write(response) // discards input left over from the previous frame first
 ```
-## Testing
 
-### Linux and Mac OS
-- `socat -d -d pty,raw,echo=0 pty,raw,echo=0`
-- on Mac OS, the socat command can be installed using homebrew:
-	````brew install socat````
-
-### Windows
-- [Null-modem emulator](http://com0com.sourceforge.net/)
-- [Terminal](https://sites.google.com/site/terminalbpp/)
+- `Read` returns one frame, `ErrTimeout` when nothing arrived within the timeout, and `io.EOF`
+  once the reader is closed or the source ended or failed. Bytes received before the source
+  ended are still delivered.
+- `Write` flushes pending input before writing, so a late echo or noise does not mix into the
+  next frame.
+- `Close` stops the reader goroutines and closes the source.

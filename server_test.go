@@ -217,10 +217,11 @@ func TestInvalidDeviceId(t *testing.T) {
 	handler.Timeout = time.Second
 	client := modbus.NewClient(handler)
 
-	// read results
+	// A unit ID the server does not serve is answered with exception 11 over TCP,
+	// instead of letting the client run into its timeout.
 	_, err := client.ReadHoldingRegisters(1, 2)
 	got := fmt.Sprintf("%v", err)
-	expect := "127.0.0.1:3333: i/o timeout"
+	expect := "exception '11'"
 	if !strings.Contains(got, expect) {
 		t.Errorf("expected %v, got %v", expect, got)
 	}

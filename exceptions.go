@@ -2,34 +2,36 @@ package mbserver
 
 import "fmt"
 
-// Exception codes.
+// Exception is a Modbus exception code, named as in the Modbus Application Protocol
+// Specification V1.1b3, section 7.
 type Exception uint8
 
 const (
-	// Success operation successful.
+	// Success means the request was processed; it is not sent on the wire.
 	Success Exception = 0
-	// IllegalFunction function code received in the query is not recognized or allowed by slave.
+	// IllegalFunction: the function code is not supported by the server.
 	IllegalFunction Exception = 1
-	// IllegalDataAddress data address of some or all the required entities are not allowed or do not exist in slave.
+	// IllegalDataAddress: the requested address range is not available on the server.
 	IllegalDataAddress Exception = 2
-	// IllegalDataValue value is not accepted by slave.
+	// IllegalDataValue: a value in the request, e.g. the quantity, is not allowed.
 	IllegalDataValue Exception = 3
-	// SlaveDeviceFailure Unrecoverable error occurred while slave was attempting to perform requested action.
-	SlaveDeviceFailure Exception = 4
-	// AcknowledgeSlave has accepted request and is processing it, but a long duration of time is required. This response is returned to prevent a timeout error from occurring in the master. Master can next issue a Poll Program Complete message to determine whether processing is completed.
-	AcknowledgeSlave Exception = 5
-	// SlaveDeviceBusy is engaged in processing a long-duration command. Master should retry later.
-	SlaveDeviceBusy Exception = 6
-	// NegativeAcknowledge Slave cannot perform the programming functions. Master should request diagnostic or error information from slave.
+	// ServerDeviceFailure: an unrecoverable error occurred while the server processed the request.
+	ServerDeviceFailure Exception = 4
+	// Acknowledge: the server accepted a long-running request and is still processing it.
+	Acknowledge Exception = 5
+	// ServerDeviceBusy: the server is processing a long-running command; the client should retry later.
+	ServerDeviceBusy Exception = 6
+	// NegativeAcknowledge: the server cannot perform the requested program function.
 	NegativeAcknowledge Exception = 7
-	// MemoryParityError Slave detected a parity error in memory. Master can retry the request, but service may be required on the slave device.
+	// MemoryParityError: the server detected a parity error in its memory.
 	MemoryParityError Exception = 8
 
 	// 9 is reserved by the Modbus specification.
 
-	// GatewayPathUnavailable Specialized for Modbus gateways. Indicates a misconfigured gateway.
+	// GatewayPathUnavailable: a gateway could not allocate a path to the target device.
 	GatewayPathUnavailable Exception = 10
-	// GatewayTargetDeviceFailedToRespond Specialized for Modbus gateways. Sent when slave fails to respond.
+	// GatewayTargetDeviceFailedToRespond: no device answered for the requested unit ID. The
+	// server sends it over Modbus TCP for unit IDs it does not serve.
 	GatewayTargetDeviceFailedToRespond Exception = 11
 )
 
@@ -38,32 +40,30 @@ func (e Exception) Error() string {
 }
 
 func (e Exception) String() string {
-	var str string
 	switch e {
 	case Success:
-		str = "Success"
+		return "Success"
 	case IllegalFunction:
-		str = "IllegalFunction"
+		return "IllegalFunction"
 	case IllegalDataAddress:
-		str = "IllegalDataAddress"
+		return "IllegalDataAddress"
 	case IllegalDataValue:
-		str = "IllegalDataValue"
-	case SlaveDeviceFailure:
-		str = "SlaveDeviceFailure"
-	case AcknowledgeSlave:
-		str = "AcknowledgeSlave"
-	case SlaveDeviceBusy:
-		str = "SlaveDeviceBusy"
+		return "IllegalDataValue"
+	case ServerDeviceFailure:
+		return "ServerDeviceFailure"
+	case Acknowledge:
+		return "Acknowledge"
+	case ServerDeviceBusy:
+		return "ServerDeviceBusy"
 	case NegativeAcknowledge:
-		str = "NegativeAcknowledge"
+		return "NegativeAcknowledge"
 	case MemoryParityError:
-		str = "MemoryParityError"
+		return "MemoryParityError"
 	case GatewayPathUnavailable:
-		str = "GatewayPathUnavailable"
+		return "GatewayPathUnavailable"
 	case GatewayTargetDeviceFailedToRespond:
-		str = "GatewayTargetDeviceFailedToRespond"
+		return "GatewayTargetDeviceFailedToRespond"
 	default:
-		str = "unknown"
+		return "unknown"
 	}
-	return str
 }

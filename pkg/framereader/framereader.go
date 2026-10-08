@@ -1,8 +1,6 @@
 package framereader
 
 import (
-	"errors"
-	"io"
 	"time"
 )
 
@@ -37,8 +35,17 @@ func (r *Reader) frameReader() {
 			}
 
 			n, err := r.ioRead(ioBuffer)
-			if err != nil && !errors.Is(err, io.EOF) {
-				// ioReader should not be closed, but if it is, we should stop the framereader goroutine
+			if err != nil {
+				// The source is closed or failed. io.EOF included: a source at its end
+				// delivers nothing more, and reading on would only spin.
+				if n > 0 {
+					chunk := make([]byte, n)
+					copy(chunk, ioBuffer[:n])
+					select {
+					case ioData <- chunk:
+					case <-r.stop:
+					}
+				}
 				return
 			}
 
@@ -65,6 +72,13 @@ func (r *Reader) frameReader() {
 		select {
 		case chunk, ok := <-ioData:
 			if !ok {
+				// The source ended: deliver the frame read so far before closing.
+				if len(buffer) > 0 {
+					select {
+					case r.data <- buffer:
+					case <-r.stop:
+					}
+				}
 				return
 			}
 

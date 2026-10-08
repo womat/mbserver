@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,10 +20,14 @@ type frame struct {
 type dataSource struct {
 	stream                    []frame
 	currentframe, currentdata int
+	closed                    chan struct{}
+	closeOnce                 sync.Once
 }
 
 func (ds *dataSource) Read(data []byte) (int, error) {
 	if ds.currentframe >= len(ds.stream) {
+		// A silent serial line blocks until the port is closed.
+		<-ds.closed
 		return 0, io.EOF
 	}
 
@@ -58,6 +63,7 @@ func (ds *dataSource) Write(data []byte) (int, error) {
 }
 
 func (ds *dataSource) Close() error {
+	ds.closeOnce.Do(func() { close(ds.closed) })
 	return nil
 }
 
@@ -92,6 +98,7 @@ func TestListenRTU(t *testing.T) {
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x03, 0x03, 0x02, 0x12, 0x34, 0xcc, 0xf3}})
 
 	source := &dataSource{
+		closed: make(chan struct{}),
 		stream: []frame{
 			{
 				data:           testSequenz.frames[0].frame,
@@ -168,6 +175,7 @@ func TestListenRTU1(t *testing.T) {
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x03, 0x03, 0x02, 0x12, 0x34, 0xcc, 0xf3}})
 
 	source := &dataSource{
+		closed: make(chan struct{}),
 		stream: []frame{
 			// Frame 0
 			{
