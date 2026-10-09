@@ -25,7 +25,8 @@ production by [smartmeter](https://github.com/womat/smartmeter), a Fronius Smart
 - **Offline unit IDs**: `SetOnline(id, false)` makes a unit ID go silent while it keeps its
   registers, e.g. for a gateway whose source is lost
 - **Activity counters**: `Stats` reports the answered requests per transport and the connected
-  TCP clients
+  TCP clients; `Clients` lists each open TCP connection with its address and requests, and a
+  handler sees the address of the client that sent a frame
 - **Clean shutdown**: `Close` stops listeners, disconnects TCP clients and closes serial ports
 - **Customizable** function handlers, e.g. a read-only server, or a gateway that forwards
   requests to real devices (see [Gateway](#gateway))
@@ -128,6 +129,20 @@ st := s.Stats() // st.TCPRequests, st.RTURequests, st.TCPClients
 `TCPRequests` and `RTURequests` count the requests answered since `NewServer`, exceptions included;
 requests for unknown or offline unit IDs and broadcasts are not counted. Poll them and take the
 difference to show activity.
+
+```go
+for _, c := range s.Clients() { // the open TCP connections, oldest first
+	fmt.Println(c.Remote, c.Since, c.Requests)
+}
+```
+
+A function handler sees which client sent a frame; frames from a serial line carry no address:
+
+```go
+if r, ok := frame.(interface{ RemoteAddr() net.Addr }); ok {
+	slog.Debug("request", "remote", r.RemoteAddr())
+}
+```
 
 ### Function codes
 

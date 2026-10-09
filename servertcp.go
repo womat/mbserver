@@ -78,7 +78,9 @@ func (s *Server) acceptTCP(ctx context.Context, listen net.Listener) {
 // handleConn reads a stream of Modbus TCP frames from conn and forwards each
 // Request to the processing channel.
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
+	s.addClient(conn)
 	defer func() {
+		s.removeClient(conn)
 		_ = conn.Close()
 		<-s.connSemaphore // release the slot
 		s.wg.Done()
@@ -145,6 +147,7 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 			s.log.Warn("Unable to parse frame", "remote", remote, "error", err)
 			return
 		}
+		frame.Remote = remote
 
 		select {
 		case s.request <- Request{conn, frame}:

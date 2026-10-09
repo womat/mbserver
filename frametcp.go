@@ -3,6 +3,7 @@ package mbserver
 import (
 	"encoding/binary"
 	"fmt"
+	"net"
 )
 
 // TCPFrame is the Modbus TCP frame.
@@ -13,6 +14,18 @@ type TCPFrame struct {
 	UnitId                uint8
 	Function              uint8
 	Data                  []byte
+
+	// Remote is the address of the client that sent the frame; set by the server for every
+	// request it reads, nil for frames built elsewhere.
+	Remote net.Addr
+}
+
+// RemoteAddr returns the address of the client that sent the frame, or nil. A function handler
+// reaches it with a type assertion:
+//
+//	if r, ok := frame.(interface{ RemoteAddr() net.Addr }); ok { ... r.RemoteAddr() ... }
+func (frame *TCPFrame) RemoteAddr() net.Addr {
+	return frame.Remote
 }
 
 // NewTCPFrame converts a packet to a Modbus TCP frame.

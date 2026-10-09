@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -48,6 +49,16 @@ type Server struct {
 
 	tcpRequests atomic.Uint64 // requests answered over TCP, see Stats
 	rtuRequests atomic.Uint64 // requests answered over RTU, see Stats
+
+	clientsMu sync.Mutex
+	clients   map[io.ReadWriteCloser]*Client // open TCP connections, see Clients
+}
+
+// Client is an open Modbus TCP connection, see Clients.
+type Client struct {
+	Remote   net.Addr  // address of the client
+	Since    time.Time // when the connection was accepted
+	Requests uint64    // requests answered on this connection, exceptions included
 }
 
 // Request contains the connection and Modbus frame.
@@ -75,6 +86,8 @@ func NewServer(log *slog.Logger) *Server {
 
 		openSerial:     openSerialPort,
 		reopenInterval: defaultReopenInterval,
+
+		clients: map[io.ReadWriteCloser]*Client{},
 	}
 
 	// Add default functions.
@@ -245,6 +258,39 @@ func (s *Server) Stats() Stats {
 	}
 }
 
+// Clients returns the open Modbus TCP connections, the oldest first. Like Stats, Requests counts
+// the answered requests; requests for unknown or offline unit IDs and broadcasts are not counted.
+func (s *Server) Clients() []Client {
+	s.clientsMu.Lock()
+	list := make([]Client, 0, len(s.clients))
+	for _, c := range s.clients {
+		list = append(list, *c)
+	}
+	s.clientsMu.Unlock()
+	slices.SortFunc(list, func(a, b Client) int { return a.Since.Compare(b.Since) })
+	return list
+}
+
+func (s *Server) addClient(conn net.Conn) {
+	s.clientsMu.Lock()
+	s.clients[conn] = &Client{Remote: conn.RemoteAddr(), Since: time.Now()}
+	s.clientsMu.Unlock()
+}
+
+func (s *Server) removeClient(conn net.Conn) {
+	s.clientsMu.Lock()
+	delete(s.clients, conn)
+	s.clientsMu.Unlock()
+}
+
+func (s *Server) countClient(conn io.ReadWriteCloser) {
+	s.clientsMu.Lock()
+	if c := s.clients[conn]; c != nil {
+		c.Requests++
+	}
+	s.clientsMu.Unlock()
+}
+
 // RegisterFunctionHandler overrides the handler for a Modbus function code; nil removes it, so the
 // function is answered with IllegalFunction.
 func (s *Server) RegisterFunctionHandler(funcCode uint8, function func(*Server, Framer) ([]byte, Exception)) {
@@ -334,6 +380,7 @@ func (s *Server) handler(ctx context.Context) {
 			}
 			if isTCP {
 				s.tcpRequests.Add(1)
+				s.countClient(request.conn)
 			} else {
 				s.rtuRequests.Add(1)
 			}
