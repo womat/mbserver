@@ -38,7 +38,7 @@ func tcpTestServer(t *testing.T) (*Server, net.Conn) {
 // unit ID: function code and data, or function|0x80 and the exception.
 func readRegister(t *testing.T, conn net.Conn, unit byte) []byte {
 	t.Helper()
-	request := TCPFrame{TransactionIdentifier: 1, Device: unit, Function: 3}
+	request := TCPFrame{TransactionIdentifier: 1, UnitId: unit, Function: 3}
 	SetRegisterValues(&request, 0, 1, []uint16{})
 	_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
 	if _, err := conn.Write(request.Bytes()); err != nil {
@@ -91,16 +91,16 @@ func TestSetOnlineUnknownUnit(t *testing.T) {
 	}
 }
 
-func TestRemoveDeviceForgetsOffline(t *testing.T) {
+func TestRemoveUnitForgetsOffline(t *testing.T) {
 	s := NewServer(quietLogger())
-	if err := s.NewDevice(5); err != nil {
+	if err := s.NewUnit(5); err != nil {
 		t.Fatal(err)
 	}
 	_ = s.SetOnline(5, false)
-	if err := s.RemoveDevice(5); err != nil {
+	if err := s.RemoveUnit(5); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.NewDevice(5); err != nil {
+	if err := s.NewUnit(5); err != nil {
 		t.Fatal(err)
 	}
 	if !s.Online(5) {

@@ -230,7 +230,7 @@ func ExampleServer_RegisterFunctionHandler() {
 			}
 			data := make([]byte, 1+dataSize)
 			data[0] = byte(dataSize)
-			for i := range s.devices[1].DiscreteInputs[register:endRegister] {
+			for i := range s.units[1].DiscreteInputs[register:endRegister] {
 				// Return all 1s, regardless of the value in the DiscreteInputs array.
 				shift := uint(i) % 8
 				data[1+i/8] |= byte(1 << shift)

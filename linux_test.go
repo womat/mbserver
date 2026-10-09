@@ -22,7 +22,7 @@ func TestModbusRTU(t *testing.T) {
 		t.Skip("socat not installed")
 	}
 
-	// Create a pair of virtual serial devices.
+	// Create a pair of virtual serial units.
 	dir := t.TempDir()
 	foo, bar := filepath.Join(dir, "ttyFOO"), filepath.Join(dir, "ttyBAR")
 	cmd := exec.Command("socat", "pty,raw,echo=0,link="+foo, "pty,raw,echo=0,link="+bar)
@@ -32,7 +32,7 @@ func TestModbusRTU(t *testing.T) {
 	defer cmd.Wait()
 	defer cmd.Process.Kill()
 
-	// Wait for the virtual serial devices to be created.
+	// Wait for the virtual serial units to be created.
 	deadline := time.Now().Add(5 * time.Second)
 	for {
 		_, errFoo := os.Stat(foo)

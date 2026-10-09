@@ -8,7 +8,7 @@ func TestNewTCPFrame(t *testing.T) {
 		t.Fatalf("expected %v, got %v", nil, err)
 	}
 
-	got := frame.Address
+	got := frame.UnitId
 	expect := 0x15
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v", expect, got)
@@ -38,7 +38,7 @@ func TestNewTCPFrameBadCRC(t *testing.T) {
 
 func TestTCPFrameBytes(t *testing.T) {
 	frame := &RTUFrame{
-		Address:  uint8(1),
+		UnitId:   uint8(1),
 		Function: uint8(4),
 		Data:     []byte{0x02, 0xff, 0xff},
 	}

@@ -27,7 +27,8 @@ production by [smartmeter](https://github.com/womat/smartmeter), a Fronius Smart
 - **Activity counters**: `Stats` reports the answered requests per transport and the connected
   TCP clients
 - **Clean shutdown**: `Close` stops listeners, disconnects TCP clients and closes serial ports
-- **Customizable** function handlers, e.g. a read-only server
+- **Customizable** function handlers, e.g. a read-only server, or a gateway that forwards
+  requests to real devices (see [Gateway](#gateway))
 - Logging via `log/slog`; no cgo, runs on Linux, macOS and Windows (serial via
   [go.bug.st/serial](https://github.com/bugst/go-serial))
 
@@ -64,7 +65,7 @@ func main() {
 	}
 	defer s.Close()
 
-	if err := s.NewDevice(200); err != nil {
+	if err := s.NewUnit(200); err != nil {
 		log.Fatal(err)
 	}
 
@@ -94,7 +95,7 @@ func main() {
 
 | Method                                   | Description                                                        |
 |------------------------------------------|--------------------------------------------------------------------|
-| `NewDevice(id)` / `RemoveDevice(id)`     | add or remove a unit ID (1–247)                                    |
+| `NewUnit(id)` / `RemoveUnit(id)`         | add or remove a unit ID (1–247)                                    |
 | `SetHoldingRegisters(id, start, values)` | write consecutive holding registers under one lock                 |
 | `HoldingRegisters(id, start, quantity)`  | copy of holding registers                                          |
 | `UpdateHoldingRegisters(id, func)`       | change any holding registers of a unit ID as one consistent update |
@@ -150,6 +151,35 @@ for _, code := range []uint8{5, 6, 15, 16} {
 }
 ```
 
+### Gateway
+
+A handler does not have to use the register memory: it can forward the request to a real device
+and return its answer. The unit ID of the request selects the device; only unit IDs created with
+`NewUnit` are passed to the handlers. Disable broadcasts, so a write to unit ID 0 cannot reach
+every device at once.
+
+```go
+s := mbserver.NewServer(slog.Default())
+s.SetBroadcast(false)
+_ = s.RemoveUnit(1) // exists from the start; keep only the forwarded unit IDs
+_ = s.NewUnit(11)
+
+s.RegisterFunctionHandler(3, func(_ *mbserver.Server, frame mbserver.Framer) ([]byte, mbserver.Exception) {
+	data := frame.GetData() // address (2 bytes) + quantity (2 bytes)
+	if len(data) != 4 {
+		return nil, mbserver.IllegalDataValue
+	}
+	values, err := readFromDevice(frame.GetUnitId(), data) // your client, e.g. Modbus RTU
+	if err != nil {
+		return nil, mbserver.GatewayTargetDeviceFailedToRespond
+	}
+	return append([]byte{byte(len(values))}, values...), mbserver.Success
+})
+```
+
+Requests are processed one after the other (see [Behavior](#behavior)), so a slow device delays
+the requests behind it.
+
 ### Serial line state
 
 ```go
@@ -170,6 +200,10 @@ be opened at all, so a wrong device name shows up at start.
   (`GatewayTargetDeviceFailedToRespond`), so the client does not run into its timeout. On a serial
   bus it stays silent, because another device may own that unit ID.
 - **Broadcasts** (unit ID 0) are applied to every unit ID and not answered, as specified.
+  `SetBroadcast(false)` drops them instead: silence over RTU, exception 11 over TCP.
+- **Malformed requests** are answered with `IllegalDataValue`, e.g. FC5 or FC6 without exactly
+  address and value. A function handler that panics is answered with `ServerDeviceFailure`;
+  the server logs the panic and keeps serving.
 - **RTU framing**: a request ends after the silent interval t3.5 — about 4 ms at 9600 baud, 1.75 ms
   above 19200 baud. USB-RS485 adapters deliver bytes in packets with gaps of several milliseconds;
   if requests arrive split (CRC errors in the log), set `SerialConfig.InterFrameDelay`, e.g. to
@@ -185,6 +219,22 @@ The exception codes follow the Modbus Application Protocol Specification V1.1b3:
 `IllegalFunction` (1), `IllegalDataAddress` (2), `IllegalDataValue` (3), `ServerDeviceFailure` (4),
 `Acknowledge` (5), `ServerDeviceBusy` (6), `NegativeAcknowledge` (7), `MemoryParityError` (8),
 `GatewayPathUnavailable` (10), `GatewayTargetDeviceFailedToRespond` (11).
+
+## Upgrading from v0.2.x
+
+v0.3.0 names the Modbus address after the specification, the unit identifier, instead of
+"device":
+
+| v0.2.x                                     | v0.3.0                                     |
+|--------------------------------------------|--------------------------------------------|
+| `NewDevice(id)` / `RemoveDevice(id)`       | `NewUnit(id)` / `RemoveUnit(id)`           |
+| `type Device`                              | `type Unit`                                |
+| `Framer.GetDevice()` / `SetDevice(id)`     | `Framer.GetUnitId()` / `SetUnitId(id)`     |
+| `TCPFrame.Device`, `RTUFrame.Address`      | `TCPFrame.UnitId`, `RTUFrame.UnitId`       |
+| log key `device`                           | log key `unitId`                           |
+
+New: `SetBroadcast`. Fixed: FC5 and FC6 with too few data bytes panicked and stopped the process;
+they are now answered with `IllegalDataValue`, and a panicking handler no longer stops the server.
 
 ## Upgrading from v0.0.x
 

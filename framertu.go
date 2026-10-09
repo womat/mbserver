@@ -7,7 +7,7 @@ import (
 
 // RTUFrame is the Modbus RTU frame.
 type RTUFrame struct {
-	Address  uint8
+	UnitId   uint8
 	Function uint8
 	Data     []byte
 }
@@ -31,7 +31,7 @@ func NewRTUFrame(packet []byte) (*RTUFrame, error) {
 	copy(data, packet[2:pLen-2])
 
 	frame := &RTUFrame{
-		Address:  packet[0],
+		UnitId:   packet[0],
 		Function: packet[1],
 		Data:     data,
 	}
@@ -51,7 +51,7 @@ func (frame *RTUFrame) Copy() Framer {
 func (frame *RTUFrame) Bytes() []byte {
 
 	buf := make([]byte, 0, 2+len(frame.Data)+2) // 2 bytes for address and function, len(frame.Data) for data, 2 bytes for CRC
-	buf = append(buf, frame.Address, frame.Function)
+	buf = append(buf, frame.UnitId, frame.Function)
 	buf = append(buf, frame.Data...)
 
 	crc := crcModbus(buf)
@@ -59,14 +59,14 @@ func (frame *RTUFrame) Bytes() []byte {
 	return buf
 }
 
-// GetDevice returns the Modbus DeviceId.
-func (frame *RTUFrame) GetDevice() uint8 {
-	return frame.Address
+// GetUnitId returns the Modbus unit identifier.
+func (frame *RTUFrame) GetUnitId() uint8 {
+	return frame.UnitId
 }
 
-// SetDevice set the RTUFrame Modbus DeviceId.
-func (frame *RTUFrame) SetDevice(id uint8) {
-	frame.Address = id
+// SetUnitId sets the RTUFrame Modbus unit identifier.
+func (frame *RTUFrame) SetUnitId(id uint8) {
+	frame.UnitId = id
 }
 
 // GetFunction returns the Modbus function code.

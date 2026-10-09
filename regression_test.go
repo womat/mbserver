@@ -31,7 +31,7 @@ func TestRTUKeepsServingAfterIdle(t *testing.T) {
 
 	time.Sleep(300 * time.Millisecond) // three read timeouts without a request
 
-	request := RTUFrame{Address: 1, Function: 3}
+	request := RTUFrame{UnitId: 1, Function: 3}
 	SetRegisterValues(&request, 0, 1, []uint16{})
 	_ = client.SetDeadline(time.Now().Add(2 * time.Second))
 	if _, err := client.Write(request.Bytes()); err != nil {
@@ -68,7 +68,7 @@ func TestCloseWithConnectedTCPClient(t *testing.T) {
 	}
 	defer conn.Close()
 
-	request := TCPFrame{TransactionIdentifier: 1, Device: 1, Function: 3}
+	request := TCPFrame{TransactionIdentifier: 1, UnitId: 1, Function: 3}
 	SetRegisterValues(&request, 0, 1, []uint16{})
 	_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
 	if _, err = conn.Write(request.Bytes()); err != nil {
@@ -94,7 +94,7 @@ func TestCloseWithConnectedTCPClient(t *testing.T) {
 
 func TestHoldingRegisterAPI(t *testing.T) {
 	s := NewServer(quietLogger())
-	if err := s.NewDevice(200); err != nil {
+	if err := s.NewUnit(200); err != nil {
 		t.Fatal(err)
 	}
 
@@ -106,14 +106,14 @@ func TestHoldingRegisterAPI(t *testing.T) {
 		t.Errorf("HoldingRegisters() = %v, %v; want [0x3f6 0xfafa]", got, err)
 	}
 	if other, _ := s.HoldingRegisters(1, 4124, 1); other[0] != 0 {
-		t.Errorf("device 1 register 4124 = %d, want 0: devices must not share registers", other[0])
+		t.Errorf("unit 1 register 4124 = %d, want 0: units must not share registers", other[0])
 	}
 
 	if err = s.SetHoldingRegisters(200, 65535, []uint16{1, 2}); err != ErrRange {
 		t.Errorf("SetHoldingRegisters past the end = %v, want ErrRange", err)
 	}
 	if _, err = s.HoldingRegisters(7, 0, 1); err == nil {
-		t.Error("HoldingRegisters on an unknown device succeeded")
+		t.Error("HoldingRegisters on an unknown unit succeeded")
 	}
 
 	err = s.UpdateHoldingRegisters(1, func(r []uint16) error { r[0], r[1] = 7, 8; return nil })
@@ -162,7 +162,7 @@ func TestNoTornReads(t *testing.T) {
 		}
 	}()
 
-	request := TCPFrame{TransactionIdentifier: 1, Device: 1, Function: 3}
+	request := TCPFrame{TransactionIdentifier: 1, UnitId: 1, Function: 3}
 	SetRegisterValues(&request, 4124, 2, []uint16{})
 	response := make([]byte, 13) // MBAP 7 + function 1 + byte count 1 + 4 data
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))

@@ -32,8 +32,9 @@ type Server struct {
 	openSerial     func(port string, config SerialConfig) (io.ReadWriteCloser, error)
 	reopenInterval time.Duration
 	function       [256]func(*Server, Framer) ([]byte, Exception)
-	devices        map[byte]Device
+	units          map[byte]Unit
 	offline        map[byte]bool // unit IDs that keep their registers but do not answer, see SetOnline
+	noBroadcast    bool          // unit ID 0 is dropped instead of applied to every unit, see SetBroadcast
 
 	connSemaphore chan struct{} // limits concurrent connections
 
@@ -55,8 +56,8 @@ type Request struct {
 	frame Framer
 }
 
-// Device contains the Registers of a Modbus Device.
-type Device struct {
+// Unit contains the registers of one Modbus unit ID.
+type Unit struct {
 	DiscreteInputs   []byte
 	Coils            []byte
 	HoldingRegisters []uint16
@@ -87,10 +88,10 @@ func NewServer(log *slog.Logger) *Server {
 	s.function[16] = WriteHoldingRegisters
 
 	// Allocate Modbus memory maps.
-	s.devices = map[byte]Device{}
+	s.units = map[byte]Unit{}
 	s.offline = map[byte]bool{}
-	if err := s.NewDevice(1); err != nil {
-		panic("mbserver: failed to create default device: " + err.Error())
+	if err := s.NewUnit(1); err != nil {
+		panic("mbserver: failed to create default unit: " + err.Error())
 	}
 	return s
 }
@@ -109,7 +110,7 @@ func (s *Server) Start(ctx context.Context) error {
 	return err
 }
 
-func (s *Server) NewDevice(id byte) error {
+func (s *Server) NewUnit(id byte) error {
 	if id < idMin || id > idMax {
 		return fmt.Errorf("invalid modbus id %v", id)
 	}
@@ -117,10 +118,10 @@ func (s *Server) NewDevice(id byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.devices[id]; ok {
-		return fmt.Errorf("mbserver: device %v already exists", id)
+	if _, ok := s.units[id]; ok {
+		return fmt.Errorf("mbserver: unit %v already exists", id)
 	}
-	s.devices[id] = Device{
+	s.units[id] = Unit{
 		DiscreteInputs:   make([]byte, 65536),
 		Coils:            make([]byte, 65536),
 		HoldingRegisters: make([]uint16, 65536),
@@ -130,25 +131,25 @@ func (s *Server) NewDevice(id byte) error {
 	return nil
 }
 
-func (s *Server) RemoveDevice(id byte) error {
+func (s *Server) RemoveUnit(id byte) error {
 	if id < idMin || id > idMax {
 		return fmt.Errorf("invalid modbus id %v", id)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.devices[id]; !ok {
-		return fmt.Errorf("mbserver: device %v doesn't exist", id)
+	if _, ok := s.units[id]; !ok {
+		return fmt.Errorf("mbserver: unit %v doesn't exist", id)
 	}
 	// delete Modbus memory maps.
-	delete(s.devices, id)
+	delete(s.units, id)
 	delete(s.offline, id)
 	return nil
 }
 
-// ErrRange is returned when a register range does not fit into the 65536 registers of a device.
+// ErrRange is returned when a register range does not fit into the 65536 registers of a unit.
 var ErrRange = errors.New("mbserver: register range out of bounds")
 
-// SetHoldingRegisters writes values to the holding registers of device id, starting at
+// SetHoldingRegisters writes values to the holding registers of unit id, starting at
 // start, under one lock: a client never reads a partly written multi-register value.
 func (s *Server) SetHoldingRegisters(id byte, start uint16, values []uint16) error {
 	return s.UpdateHoldingRegisters(id, func(registers []uint16) error {
@@ -160,14 +161,14 @@ func (s *Server) SetHoldingRegisters(id byte, start uint16, values []uint16) err
 	})
 }
 
-// HoldingRegisters returns a copy of quantity holding registers of device id, starting at start.
+// HoldingRegisters returns a copy of quantity holding registers of unit id, starting at start.
 func (s *Server) HoldingRegisters(id byte, start uint16, quantity int) ([]uint16, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	dev, ok := s.devices[id]
+	dev, ok := s.units[id]
 	if !ok {
-		return nil, fmt.Errorf("mbserver: device %v doesn't exist", id)
+		return nil, fmt.Errorf("mbserver: unit %v doesn't exist", id)
 	}
 	if quantity < 0 || int(start)+quantity > len(dev.HoldingRegisters) {
 		return nil, ErrRange
@@ -175,21 +176,20 @@ func (s *Server) HoldingRegisters(id byte, start uint16, quantity int) ([]uint16
 	return append([]uint16(nil), dev.HoldingRegisters[int(start):int(start)+quantity]...), nil
 }
 
-// UpdateHoldingRegisters calls update with the holding registers of device id while holding
+// UpdateHoldingRegisters calls update with the holding registers of unit id while holding
 // the write lock, so several registers can be changed as one consistent update. update must
 // not keep the slice or call other methods of s.
 func (s *Server) UpdateHoldingRegisters(id byte, update func(registers []uint16) error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	dev, ok := s.devices[id]
+	dev, ok := s.units[id]
 	if !ok {
-		return fmt.Errorf("mbserver: device %v doesn't exist", id)
+		return fmt.Errorf("mbserver: unit %v doesn't exist", id)
 	}
 	return update(dev.HoldingRegisters)
 }
 
-// RegisterFunctionHandler override the default behavior for a given Modbus function.
 // SetOnline takes a unit ID off the bus (online false) or back on it (online true). An offline
 // unit is answered like an unknown one - silence over RTU, exception GatewayTargetDeviceFailedToRespond
 // over TCP - but keeps its registers, and SetHoldingRegisters and UpdateHoldingRegisters still
@@ -198,8 +198,8 @@ func (s *Server) UpdateHoldingRegisters(id byte, update func(registers []uint16)
 func (s *Server) SetOnline(id byte, online bool) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.devices[id]; !ok {
-		return fmt.Errorf("mbserver: device %v doesn't exist", id)
+	if _, ok := s.units[id]; !ok {
+		return fmt.Errorf("mbserver: unit %v doesn't exist", id)
 	}
 	if online {
 		delete(s.offline, id)
@@ -213,8 +213,18 @@ func (s *Server) SetOnline(id byte, online bool) error {
 func (s *Server) Online(id byte) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	_, ok := s.devices[id]
+	_, ok := s.units[id]
 	return ok && !s.offline[id]
+}
+
+// SetBroadcast controls requests for unit ID 0. Enabled (the default), they are applied to
+// every unit ID and not answered, as specified. Disabled, they are dropped: silence over RTU,
+// exception GatewayTargetDeviceFailedToRespond over TCP. A gateway whose handlers forward
+// requests to real devices disables it, so a broadcast write cannot reach all of them at once.
+func (s *Server) SetBroadcast(enabled bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.noBroadcast = !enabled
 }
 
 // Stats is a snapshot of the server's activity since NewServer.
@@ -235,18 +245,30 @@ func (s *Server) Stats() Stats {
 	}
 }
 
+// RegisterFunctionHandler overrides the handler for a Modbus function code; nil removes it, so the
+// function is answered with IllegalFunction.
 func (s *Server) RegisterFunctionHandler(funcCode uint8, function func(*Server, Framer) ([]byte, Exception)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.function[funcCode] = function
 }
 
-func (s *Server) handle(request Request) Framer {
+func (s *Server) handle(request Request) (response Framer) {
 	var exception Exception
 	var data []byte
 
-	response := request.frame.Copy()
+	response = request.frame.Copy()
 	function := request.frame.GetFunction()
+
+	// A panicking handler, e.g. a custom one indexing a short frame, must not take the whole
+	// process down: answer ServerDeviceFailure and keep serving.
+	defer func() {
+		if r := recover(); r != nil {
+			s.log.Error("function handler panicked", "function", function, "unitId", request.frame.GetUnitId(), "panic", r)
+			response = request.frame.Copy()
+			response.SetException(ServerDeviceFailure)
+		}
+	}()
 
 	if s.function[function] != nil {
 		data, exception = s.function[function](s, request.frame)
@@ -271,44 +293,41 @@ func (s *Server) handler(ctx context.Context) {
 			return
 
 		case request := <-s.request:
-			device := request.frame.GetDevice()
-			if device == 0 {
-				// broadcast
-				s.mu.RLock() // nur für das Lesen der device-Map
-				devices := make([]byte, 0, len(s.devices))
-				for id := range s.devices {
-					devices = append(devices, id)
+			unitId := request.frame.GetUnitId()
+			_, isTCP := request.frame.(*TCPFrame)
+			if unitId == 0 {
+				s.mu.RLock() // only to read the unit map
+				noBroadcast := s.noBroadcast
+				units := make([]byte, 0, len(s.units))
+				for id := range s.units {
+					units = append(units, id)
 				}
 				s.mu.RUnlock()
 
-				for _, id := range devices { // Lock-frei iterieren
-					request.frame.SetDevice(id)
-					_ = s.handle(request) // handle() holt eigenen Lock
+				if noBroadcast {
+					s.log.Debug("broadcast dropped")
+					s.reject(request, isTCP)
+					continue
+				}
+				for _, id := range units { // iterate without the lock
+					request.frame.SetUnitId(id)
+					_ = s.handle(request) // the handlers take the lock themselves
 				}
 				continue
 			}
 
 			s.mu.RLock()
-			_, ok := s.devices[device]
-			ok = ok && !s.offline[device]
+			_, ok := s.units[unitId]
+			ok = ok && !s.offline[unitId]
 			s.mu.RUnlock()
 
-			_, isTCP := request.frame.(*TCPFrame)
 			if !ok {
-				// On a serial bus another device may own the unit ID, so stay silent. Over TCP
-				// there is nobody else to answer: report it, so the client does not time out.
-				if isTCP {
-					s.log.Debug("request for an unknown or offline unit ID", "device", device)
-					response := request.frame.Copy()
-					response.SetException(GatewayTargetDeviceFailedToRespond)
-					if _, err := request.conn.Write(response.Bytes()); err != nil {
-						s.log.Warn("failed to write response", "error", err)
-					}
-				}
+				s.log.Debug("request for an unknown or offline unit ID", "unitId", unitId)
+				s.reject(request, isTCP)
 				continue
 			}
 
-			response := s.handle(request) // handle() → ReadCoils etc. → eigener Lock
+			response := s.handle(request) // the handlers take the lock themselves
 			if _, err := request.conn.Write(response.Bytes()); err != nil {
 				s.log.Warn("failed to write response", "error", err)
 				continue
@@ -319,6 +338,20 @@ func (s *Server) handler(ctx context.Context) {
 				s.rtuRequests.Add(1)
 			}
 		}
+	}
+}
+
+// reject answers a request nobody serves. On a serial bus another device may own the unit ID,
+// so it stays silent. Over TCP there is nobody else to answer: it reports exception
+// GatewayTargetDeviceFailedToRespond, so the client does not run into its timeout.
+func (s *Server) reject(request Request, isTCP bool) {
+	if !isTCP {
+		return
+	}
+	response := request.frame.Copy()
+	response.SetException(GatewayTargetDeviceFailedToRespond)
+	if _, err := request.conn.Write(response.Bytes()); err != nil {
+		s.log.Warn("failed to write response", "error", err)
 	}
 }
 

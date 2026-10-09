@@ -14,11 +14,11 @@ type Framer interface {
 	Bytes() []byte
 	Copy() Framer
 	GetData() []byte
-	GetDevice() uint8
+	GetUnitId() uint8
 	GetFunction() uint8
 	SetException(exception Exception)
 	SetData(data []byte)
-	SetDevice(id uint8)
+	SetUnitId(id uint8)
 }
 
 // GetException returns the Modbus exception or Success (indicating not exception).

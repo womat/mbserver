@@ -102,7 +102,7 @@ func waitForResponses(t *testing.T) {
 
 func TestListenRTU(t *testing.T) {
 	testSequenz = testsequenz{sequenz: 0, frames: []testFrame{}}
-	rtuframe := RTUFrame{Address: 1, Function: 3}
+	rtuframe := RTUFrame{UnitId: 1, Function: 3}
 
 	SetRegisterValues(&rtuframe, 1000, 1, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x01, 0x03, 0x02, 0x11, 0x22, 0x34, 0x0d}})
@@ -113,7 +113,7 @@ func TestListenRTU(t *testing.T) {
 	SetRegisterValues(&rtuframe, 3000, 2, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x01, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00, 0xfa, 0x33}})
 
-	rtuframe = RTUFrame{Address: 3, Function: 3}
+	rtuframe = RTUFrame{UnitId: 3, Function: 3}
 	SetRegisterValues(&rtuframe, 1000, 1, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x03, 0x03, 0x02, 0x12, 0x34, 0xcc, 0xf3}})
 
@@ -149,14 +149,14 @@ func TestListenRTU(t *testing.T) {
 		cancel()
 		t.Fatalf("failed to start server: %v", err)
 	}
-	serv.NewDevice(3)
+	serv.NewUnit(3)
 
-	serv.devices[1].HoldingRegisters[1000] = 0x1122
-	serv.devices[1].HoldingRegisters[2000] = 0x3344
-	serv.devices[1].HoldingRegisters[2001] = 0x5566
-	serv.devices[1].HoldingRegisters[2002] = 0x7788
-	serv.devices[1].HoldingRegisters[2003] = 0x9900
-	serv.devices[3].HoldingRegisters[1000] = 0x1234
+	serv.units[1].HoldingRegisters[1000] = 0x1122
+	serv.units[1].HoldingRegisters[2000] = 0x3344
+	serv.units[1].HoldingRegisters[2001] = 0x5566
+	serv.units[1].HoldingRegisters[2002] = 0x7788
+	serv.units[1].HoldingRegisters[2003] = 0x9900
+	serv.units[3].HoldingRegisters[1000] = 0x1234
 
 	serv.listenRTUFromReadWriter(ctx, reader)
 
@@ -176,7 +176,7 @@ func TestListenRTU(t *testing.T) {
 
 func TestListenRTU1(t *testing.T) {
 	testSequenz = testsequenz{sequenz: 0, frames: []testFrame{}}
-	rtuframe := RTUFrame{Address: 1, Function: 3}
+	rtuframe := RTUFrame{UnitId: 1, Function: 3}
 
 	SetRegisterValues(&rtuframe, 1000, 1, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{01, 03, 0x02, 0x11, 0x22, 0x34, 0x0d}})
@@ -190,7 +190,7 @@ func TestListenRTU1(t *testing.T) {
 	SetRegisterValues(&rtuframe, 0000, 1, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{01, 03, 02, 00, 00, 0xb8, 0x44}})
 
-	rtuframe = RTUFrame{Address: 3, Function: 3}
+	rtuframe = RTUFrame{UnitId: 3, Function: 3}
 	SetRegisterValues(&rtuframe, 1000, 1, []uint16{})
 	testSequenz.frames = append(testSequenz.frames, testFrame{frame: rtuframe.Bytes(), expect: []byte{0x03, 0x03, 0x02, 0x12, 0x34, 0xcc, 0xf3}})
 
@@ -257,14 +257,14 @@ func TestListenRTU1(t *testing.T) {
 		cancel2()
 		t.Fatalf("failed to start server: %v", err)
 	}
-	serv.NewDevice(3)
+	serv.NewUnit(3)
 
-	serv.devices[1].HoldingRegisters[1000] = 0x1122
-	serv.devices[1].HoldingRegisters[2000] = 0x3344
-	serv.devices[1].HoldingRegisters[2001] = 0x5566
-	serv.devices[1].HoldingRegisters[2002] = 0x7788
-	serv.devices[1].HoldingRegisters[2003] = 0x9900
-	serv.devices[3].HoldingRegisters[1000] = 0x1234
+	serv.units[1].HoldingRegisters[1000] = 0x1122
+	serv.units[1].HoldingRegisters[2000] = 0x3344
+	serv.units[1].HoldingRegisters[2001] = 0x5566
+	serv.units[1].HoldingRegisters[2002] = 0x7788
+	serv.units[1].HoldingRegisters[2003] = 0x9900
+	serv.units[3].HoldingRegisters[1000] = 0x1234
 
 	serv.listenRTUFromReadWriter(ctx2, reader)
 

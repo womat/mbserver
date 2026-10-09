@@ -10,7 +10,7 @@ type TCPFrame struct {
 	TransactionIdentifier uint16
 	ProtocolIdentifier    uint16
 	Length                uint16
-	Device                uint8
+	UnitId                uint8
 	Function              uint8
 	Data                  []byte
 }
@@ -29,7 +29,7 @@ func NewTCPFrame(packet []byte) (*TCPFrame, error) {
 		TransactionIdentifier: binary.BigEndian.Uint16(packet[0:2]),
 		ProtocolIdentifier:    binary.BigEndian.Uint16(packet[2:4]),
 		Length:                binary.BigEndian.Uint16(packet[4:6]),
-		Device:                packet[6],
+		UnitId:                packet[6],
 		Function:              packet[7],
 		Data:                  data,
 	}
@@ -39,7 +39,7 @@ func NewTCPFrame(packet []byte) (*TCPFrame, error) {
 	}
 
 	// Check expected vs actual packet length.
-	// Length field covers Device (1) + Function (1) + Data (n) = 2 + len(Data)
+	// Length field covers UnitId (1) + Function (1) + Data (n) = 2 + len(Data)
 	if int(frame.Length) != len(frame.Data)+2 {
 		return nil, fmt.Errorf("specified packet length does not match actual packet length")
 	}
@@ -62,21 +62,21 @@ func (frame *TCPFrame) Bytes() []byte {
 	binary.BigEndian.PutUint16(buf[0:2], frame.TransactionIdentifier)
 	binary.BigEndian.PutUint16(buf[2:4], frame.ProtocolIdentifier)
 	binary.BigEndian.PutUint16(buf[4:6], uint16(2+len(frame.Data)))
-	buf[6] = frame.Device
+	buf[6] = frame.UnitId
 	buf[7] = frame.Function
 	buf = append(buf, frame.Data...)
 
 	return buf
 }
 
-// GetDevice returns the Modbus DeviceId.
-func (frame *TCPFrame) GetDevice() uint8 {
-	return frame.Device
+// GetUnitId returns the Modbus unit identifier.
+func (frame *TCPFrame) GetUnitId() uint8 {
+	return frame.UnitId
 }
 
-// SetDevice set the TCPFrame Modbus DeviceId.
-func (frame *TCPFrame) SetDevice(id uint8) {
-	frame.Device = id
+// SetUnitId sets the TCPFrame Modbus unit identifier.
+func (frame *TCPFrame) SetUnitId(id uint8) {
+	frame.UnitId = id
 }
 
 // GetFunction returns the Modbus function code.

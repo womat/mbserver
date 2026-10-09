@@ -11,39 +11,39 @@ import (
 	"github.com/goburrow/modbus"
 )
 
-func TestNewDevice(t *testing.T) {
+func TestNewUnit(t *testing.T) {
 	const id = 2
 	s := NewServer(slog.Default())
 	defer s.Close()
-	if err := s.NewDevice(id); err != nil {
-		t.Fatalf("failed to create new device %v: %v\n", id, err)
+	if err := s.NewUnit(id); err != nil {
+		t.Fatalf("failed to create new unit %v: %v\n", id, err)
 	}
 }
 
-func TestNewDevice0(t *testing.T) {
+func TestNewUnit0(t *testing.T) {
 	const id = 0
 	s := NewServer(slog.Default())
 	defer s.Close()
-	if err := s.NewDevice(id); err == nil {
-		t.Fatalf("create an unsupported device %v should not be allowed\n", id)
+	if err := s.NewUnit(id); err == nil {
+		t.Fatalf("create an unsupported unit %v should not be allowed\n", id)
 	}
 }
 
-func TestNewDevice248(t *testing.T) {
+func TestNewUnit248(t *testing.T) {
 	const id = idMax + 1
 	s := NewServer(slog.Default())
 	defer s.Close()
-	if err := s.NewDevice(id); err == nil {
-		t.Fatalf("create an unsupported device %v should not be allowed\n", id)
+	if err := s.NewUnit(id); err == nil {
+		t.Fatalf("create an unsupported unit %v should not be allowed\n", id)
 	}
 }
 
-func TestNewDeviceExists(t *testing.T) {
+func TestNewUnitExists(t *testing.T) {
 	const id = 1
 	s := NewServer(slog.Default())
 	defer s.Close()
-	if err := s.NewDevice(id); err == nil {
-		t.Fatalf("create an existing device %v should not be allowed\n", id)
+	if err := s.NewUnit(id); err == nil {
+		t.Fatalf("create an existing unit %v should not be allowed\n", id)
 	}
 }
 
@@ -89,7 +89,7 @@ func TestModbus(t *testing.T) {
 
 	// Server
 	s := NewServer(slog.Default())
-	_ = s.NewDevice(100)
+	_ = s.NewUnit(100)
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("failed to start server: %v\n", err)
 	}
@@ -172,8 +172,8 @@ func TestModbus(t *testing.T) {
 	}
 
 	// Input registers
-	s.devices[100].InputRegisters[65530] = 1
-	s.devices[100].InputRegisters[65535] = 65535
+	s.units[100].InputRegisters[65530] = 1
+	s.units[100].InputRegisters[65535] = 65535
 	results, err = client.ReadInputRegisters(65530, 6)
 	if err != nil {
 		t.Errorf("expected nil, got %v\n", err)
@@ -186,7 +186,7 @@ func TestModbus(t *testing.T) {
 	}
 }
 
-func TestInvalidDeviceId(t *testing.T) {
+func TestInvalidUnitId(t *testing.T) {
 	const clients = 4
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -195,7 +195,7 @@ func TestInvalidDeviceId(t *testing.T) {
 	// Server
 	s := NewServer(slog.Default())
 	for i := byte(1); i <= clients; i++ {
-		_ = s.NewDevice(i)
+		_ = s.NewUnit(i)
 	}
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("failed to start server: %v\n", err)
@@ -239,7 +239,7 @@ func TestBroadcastWrite(t *testing.T) {
 	// Server
 	s := NewServer(slog.Default())
 	for i := byte(1); i <= clients; i++ {
-		_ = s.NewDevice(i)
+		_ = s.NewUnit(i)
 	}
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("failed to start server: %v\n", err)
@@ -296,7 +296,7 @@ func TestBroadcastRead(t *testing.T) {
 	// Server
 	s := NewServer(slog.Default())
 	for i := byte(1); i <= clients; i++ {
-		_ = s.NewDevice(i)
+		_ = s.NewUnit(i)
 	}
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("failed to start server: %v\n", err)

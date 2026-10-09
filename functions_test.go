@@ -17,18 +17,18 @@ func isEqual(a interface{}, b interface{}) bool {
 func TestReadCoils(t *testing.T) {
 	const deviceid = 247
 	s := NewServer(slog.Default())
-	_ = s.NewDevice(deviceid)
+	_ = s.NewUnit(deviceid)
 	// Set the coil values
-	s.devices[deviceid].Coils[10] = 1
-	s.devices[deviceid].Coils[11] = 1
-	s.devices[deviceid].Coils[17] = 1
-	s.devices[deviceid].Coils[18] = 1
+	s.units[deviceid].Coils[10] = 1
+	s.units[deviceid].Coils[11] = 1
+	s.units[deviceid].Coils[17] = 1
+	s.units[deviceid].Coils[18] = 1
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
 	frame.ProtocolIdentifier = 0
 	frame.Length = 6
-	frame.Device = deviceid
+	frame.UnitId = deviceid
 	frame.Function = 1
 	SetRegisterData(&frame, 10, 9)
 
@@ -54,18 +54,18 @@ func TestReadDiscreteInputs(t *testing.T) {
 	const deviceid = 240
 
 	s := NewServer(slog.Default())
-	_ = s.NewDevice(deviceid)
+	_ = s.NewUnit(deviceid)
 	// Set the discrete input values
-	s.devices[deviceid].DiscreteInputs[0] = 1
-	s.devices[deviceid].DiscreteInputs[7] = 1
-	s.devices[deviceid].DiscreteInputs[8] = 1
-	s.devices[deviceid].DiscreteInputs[9] = 1
+	s.units[deviceid].DiscreteInputs[0] = 1
+	s.units[deviceid].DiscreteInputs[7] = 1
+	s.units[deviceid].DiscreteInputs[8] = 1
+	s.units[deviceid].DiscreteInputs[9] = 1
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
 	frame.ProtocolIdentifier = 0
 	frame.Length = 6
-	frame.Device = deviceid
+	frame.UnitId = deviceid
 	frame.Function = 2
 	SetRegisterData(&frame, 0, 10)
 
@@ -89,17 +89,17 @@ func TestReadDiscreteInputs(t *testing.T) {
 func TestReadHoldingRegisters(t *testing.T) {
 	const deviceid = 240
 	s := NewServer(slog.Default())
-	_ = s.NewDevice(deviceid)
+	_ = s.NewUnit(deviceid)
 
-	s.devices[deviceid].HoldingRegisters[100] = 1
-	s.devices[deviceid].HoldingRegisters[101] = 2
-	s.devices[deviceid].HoldingRegisters[102] = 65535
+	s.units[deviceid].HoldingRegisters[100] = 1
+	s.units[deviceid].HoldingRegisters[101] = 2
+	s.units[deviceid].HoldingRegisters[102] = 65535
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
 	frame.ProtocolIdentifier = 0
 	frame.Length = 6
-	frame.Device = deviceid
+	frame.UnitId = deviceid
 	frame.Function = 3
 	SetRegisterData(&frame, 100, 3)
 
@@ -122,15 +122,15 @@ func TestReadHoldingRegisters(t *testing.T) {
 func TestReadInputRegisters(t *testing.T) {
 	s := NewServer(slog.Default())
 
-	s.devices[1].InputRegisters[200] = 1
-	s.devices[1].InputRegisters[201] = 2
-	s.devices[1].InputRegisters[202] = 65535
+	s.units[1].InputRegisters[200] = 1
+	s.units[1].InputRegisters[201] = 2
+	s.units[1].InputRegisters[202] = 65535
 
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
 	frame.ProtocolIdentifier = 0
 	frame.Length = 6
-	frame.Device = 1
+	frame.UnitId = 1
 	frame.Function = 4
 	SetRegisterData(&frame, 200, 3)
 
@@ -157,7 +157,7 @@ func TestWriteSingleCoil(t *testing.T) {
 	frame.TransactionIdentifier = 1
 	frame.ProtocolIdentifier = 0
 	frame.Length = 12
-	frame.Device = 1
+	frame.UnitId = 1
 	frame.Function = 5
 	SetRegisterData(&frame, 65535, 0xFF00)
 
@@ -170,7 +170,7 @@ func TestWriteSingleCoil(t *testing.T) {
 		t.FailNow()
 	}
 	expect := 1
-	got := s.devices[1].Coils[65535]
+	got := s.units[1].Coils[65535]
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v\n", expect, got)
 	}
@@ -184,7 +184,7 @@ func TestWriteHoldingRegister(t *testing.T) {
 	frame.TransactionIdentifier = 1
 	frame.ProtocolIdentifier = 0
 	frame.Length = 12
-	frame.Device = 1
+	frame.UnitId = 1
 	frame.Function = 6
 	SetRegisterData(&frame, 5, 6)
 
@@ -197,7 +197,7 @@ func TestWriteHoldingRegister(t *testing.T) {
 		t.FailNow()
 	}
 	expect := 6
-	got := s.devices[1].HoldingRegisters[5]
+	got := s.units[1].HoldingRegisters[5]
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v\n", expect, got)
 	}
@@ -211,7 +211,7 @@ func TestWriteMultipleCoils(t *testing.T) {
 	frame.TransactionIdentifier = 1
 	frame.ProtocolIdentifier = 0
 	frame.Length = 12
-	frame.Device = 1
+	frame.UnitId = 1
 	frame.Function = 15
 	SetRegisterBytes(&frame, 1, 2, []byte{3})
 
@@ -224,7 +224,7 @@ func TestWriteMultipleCoils(t *testing.T) {
 		t.FailNow()
 	}
 	expect := []byte{1, 1}
-	got := s.devices[1].Coils[1:3]
+	got := s.units[1].Coils[1:3]
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v\n", expect, got)
 	}
@@ -235,12 +235,12 @@ func TestWriteHoldingRegisters(t *testing.T) {
 	const deviceid = 211
 
 	s := NewServer(slog.Default())
-	_ = s.NewDevice(deviceid)
+	_ = s.NewUnit(deviceid)
 	var frame TCPFrame
 	frame.TransactionIdentifier = 1
 	frame.ProtocolIdentifier = 0
 	frame.Length = 12
-	frame.Device = deviceid
+	frame.UnitId = deviceid
 	frame.Function = 16
 	SetRegisterValues(&frame, 1, 2, []uint16{3, 4})
 
@@ -253,7 +253,7 @@ func TestWriteHoldingRegisters(t *testing.T) {
 		t.FailNow()
 	}
 	expect := []uint16{3, 4}
-	got := s.devices[deviceid].HoldingRegisters[1:3]
+	got := s.units[deviceid].HoldingRegisters[1:3]
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v\n", expect, got)
 	}
@@ -284,7 +284,7 @@ func TestOutOfBounds(t *testing.T) {
 	frame.TransactionIdentifier = 1
 	frame.ProtocolIdentifier = 0
 	frame.Length = 6
-	frame.Device = 1
+	frame.UnitId = 1
 
 	var req Request
 	req.frame = &frame

@@ -58,7 +58,7 @@ func newSerialTestServer(t *testing.T, f *fakeSerial) *Server {
 // when none arrives within wait.
 func rtuRequest(t *testing.T, conn net.Conn, unit uint8, function uint8, wait time.Duration) []byte {
 	t.Helper()
-	request := RTUFrame{Address: unit, Function: function}
+	request := RTUFrame{UnitId: unit, Function: function}
 	SetRegisterValues(&request, 0, 1, []uint16{})
 	_ = conn.SetDeadline(time.Now().Add(time.Second))
 	if _, err := conn.Write(request.Bytes()); err != nil {
@@ -203,22 +203,22 @@ func TestExceptionNames(t *testing.T) {
 	}
 }
 
-func TestRemoveDevice(t *testing.T) {
+func TestRemoveUnit(t *testing.T) {
 	s := NewServer(quietLogger())
-	if err := s.NewDevice(5); err != nil {
+	if err := s.NewUnit(5); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RemoveDevice(5); err != nil {
+	if err := s.RemoveUnit(5); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.RemoveDevice(5); err == nil {
-		t.Error("removing a device twice succeeded")
+	if err := s.RemoveUnit(5); err == nil {
+		t.Error("removing a unit twice succeeded")
 	}
-	if err := s.RemoveDevice(0); err == nil {
+	if err := s.RemoveUnit(0); err == nil {
 		t.Error("removing unit ID 0 succeeded")
 	}
 	if _, err := s.HoldingRegisters(5, 0, 1); err == nil {
-		t.Error("a removed device still has registers")
+		t.Error("a removed unit still has registers")
 	}
 }
 
@@ -243,7 +243,7 @@ func TestFrameWithRealByteTiming(t *testing.T) {
 	reader := framereader.NewReadWriteCloser(port, time.Second, interframeDelay(9600))
 	defer reader.Close()
 
-	request := RTUFrame{Address: 1, Function: 3}
+	request := RTUFrame{UnitId: 1, Function: 3}
 	SetRegisterValues(&request, 4096, 2, []uint16{})
 	maxGap := make(chan time.Duration, 1)
 	go func() {
