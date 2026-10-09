@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"net"
 	"testing"
 	"time"
 
@@ -20,15 +21,15 @@ type serverClient struct {
 	clientTCPHandler *modbus.TCPClientHandler
 }
 
-var testPortNum = 3300
-
-// getFreePort prevents collisions with ports that are in the process of being closed
-// or being used by other tests.
+// getFreePort returns a local TCP address that is free right now, so tests and benchmarks run
+// next to other Modbus servers on the same machine instead of failing on a fixed port.
 func getFreePort() string {
-	// TODO improve.  Need to know if the port is already in use
-	addr := fmt.Sprintf("127.0.0.1:%d", testPortNum)
-	testPortNum++
-	return addr
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(err)
+	}
+	defer l.Close()
+	return l.Addr().String()
 }
 
 func serverClientSetup() *serverClient {
@@ -162,7 +163,16 @@ func Example() {
 		log.Printf("%v\n", err)
 		return
 	}
-	if err := serv.ListenTCP(ctx, "127.0.0.1:1502"); err != nil {
+	// A real server listens on ":502"; the example takes any free port, so it runs next to
+	// other Modbus servers on the same machine.
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		log.Printf("%v\n", err)
+		return
+	}
+	address := l.Addr().String()
+	_ = l.Close()
+	if err = serv.ListenTCP(ctx, address); err != nil {
 		log.Printf("%v\n", err)
 		return
 	}
@@ -172,8 +182,8 @@ func Example() {
 	time.Sleep(1 * time.Millisecond)
 
 	// Connect a client.
-	handler := modbus.NewTCPClientHandler("localhost:1502")
-	err := handler.Connect()
+	handler := modbus.NewTCPClientHandler(address)
+	err = handler.Connect()
 	if err != nil {
 		log.Printf("%v\n", err)
 		return
@@ -185,7 +195,7 @@ func Example() {
 	// Write some registers.
 	_, err = client.WriteMultipleRegisters(0, 3, []byte{0, 3, 0, 4, 0, 5})
 	if err != nil {
-		log.Printf("wwwrite %v\n", err)
+		log.Printf("write %v\n", err)
 	}
 
 	// Read those registers back.
@@ -232,7 +242,15 @@ func ExampleServer_RegisterFunctionHandler() {
 		log.Printf("%v\n", err)
 		return
 	}
-	if err := serv.ListenTCP(ctx, "localhost:4321"); err != nil {
+	// Any free port, as in Example.
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		log.Printf("%v\n", err)
+		return
+	}
+	address := l.Addr().String()
+	_ = l.Close()
+	if err = serv.ListenTCP(ctx, address); err != nil {
 		log.Printf("%v\n", err)
 		return
 	}
@@ -242,8 +260,8 @@ func ExampleServer_RegisterFunctionHandler() {
 	time.Sleep(1 * time.Millisecond)
 
 	// Connect a client.
-	handler := modbus.NewTCPClientHandler("localhost:4321")
-	err := handler.Connect()
+	handler := modbus.NewTCPClientHandler(address)
+	err = handler.Connect()
 	if err != nil {
 		log.Printf("%v\n", err)
 		return

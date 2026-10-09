@@ -93,7 +93,8 @@ func TestModbus(t *testing.T) {
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("failed to start server: %v\n", err)
 	}
-	err := s.ListenTCP(ctx, "127.0.0.1:3333")
+	address := getFreePort()
+	err := s.ListenTCP(ctx, address)
 	if err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
 	}
@@ -103,7 +104,7 @@ func TestModbus(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	// Client
-	handler := modbus.NewTCPClientHandler("127.0.0.1:3333")
+	handler := modbus.NewTCPClientHandler(address)
 	// Connect manually so that multiple requests are handled in one connection session
 	err = handler.Connect()
 	if err != nil {
@@ -199,7 +200,8 @@ func TestInvalidDeviceId(t *testing.T) {
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("failed to start server: %v\n", err)
 	}
-	if err := s.ListenTCP(ctx, "127.0.0.1:3333"); err != nil {
+	address := getFreePort()
+	if err := s.ListenTCP(ctx, address); err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
 	}
 	defer s.Close()
@@ -207,7 +209,7 @@ func TestInvalidDeviceId(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	// Client
-	handler := modbus.NewTCPClientHandler("127.0.0.1:3333")
+	handler := modbus.NewTCPClientHandler(address)
 	if err := handler.Connect(); err != nil {
 		t.Errorf("failed to connect, got %v\n", err)
 		t.FailNow()
@@ -242,7 +244,8 @@ func TestBroadcastWrite(t *testing.T) {
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("failed to start server: %v\n", err)
 	}
-	if err := s.ListenTCP(ctx, "127.0.0.1:3333"); err != nil {
+	address := getFreePort()
+	if err := s.ListenTCP(ctx, address); err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
 	}
 	defer s.Close()
@@ -250,7 +253,7 @@ func TestBroadcastWrite(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	// Client
-	handler := modbus.NewTCPClientHandler("127.0.0.1:3333")
+	handler := modbus.NewTCPClientHandler(address)
 	if err := handler.Connect(); err != nil {
 		t.Errorf("failed to connect, got %v\n", err)
 		t.FailNow()
@@ -263,7 +266,7 @@ func TestBroadcastWrite(t *testing.T) {
 	// send Broadcast
 	_, err := client.WriteMultipleRegisters(1, uint16(len(data))/2, data)
 	gotErr := fmt.Sprintf("%v", err)
-	expectErr := "127.0.0.1:3333: i/o timeout"
+	expectErr := "i/o timeout" // a broadcast is not answered
 	if !strings.Contains(gotErr, expectErr) {
 		t.Errorf("expected %v, got %v", expectErr, gotErr)
 	}
@@ -298,7 +301,8 @@ func TestBroadcastRead(t *testing.T) {
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("failed to start server: %v\n", err)
 	}
-	if err := s.ListenTCP(ctx, "127.0.0.1:3333"); err != nil {
+	address := getFreePort()
+	if err := s.ListenTCP(ctx, address); err != nil {
 		t.Fatalf("failed to listen, got %v\n", err)
 	}
 	defer s.Close()
@@ -306,7 +310,7 @@ func TestBroadcastRead(t *testing.T) {
 	time.Sleep(1 * time.Millisecond)
 
 	// Client
-	handler := modbus.NewTCPClientHandler("127.0.0.1:3333")
+	handler := modbus.NewTCPClientHandler(address)
 	if err := handler.Connect(); err != nil {
 		t.Errorf("failed to connect, got %v\n", err)
 		t.FailNow()
@@ -319,7 +323,7 @@ func TestBroadcastRead(t *testing.T) {
 	// send Broadcast
 	_, err := client.ReadHoldingRegisters(1, 2)
 	gotErr := fmt.Sprintf("%v", err)
-	expectErr := "127.0.0.1:3333: i/o timeout"
+	expectErr := "i/o timeout" // a broadcast is not answered
 	if !strings.Contains(gotErr, expectErr) {
 		t.Errorf("expected %v, got %v", expectErr, gotErr)
 	}
