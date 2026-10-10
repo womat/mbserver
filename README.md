@@ -268,6 +268,7 @@ v0.1.0 changes the API:
 
 ```sh
 go vet ./...
+golangci-lint run ./...   # v2; exclusions and their reasons in .golangci.yml
 go test -race ./...
 go test -bench=.      # TCP read/write benchmarks
 ```
