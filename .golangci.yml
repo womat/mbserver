@@ -1,0 +1,16 @@
+# golangci-lint configuration for github.com/womat/mbserver, run by CI.
+# The default linter set is kept. The exclusions below are decisions, not
+# convenience - each one says why, as in golib.
+#
+# On macOS run it with GOOS=linux, so linux_test.go is checked too.
+
+version: "2"
+
+linters:
+  exclusions:
+    rules:
+      # Test code may ignore what it is not asserting on: a deferred Close of
+      # a listener, pipe or serial port, the write of a canned frame.
+      - path: _test\.go
+        linters:
+          - errcheck

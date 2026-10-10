@@ -60,10 +60,7 @@ func TestReadCloser(t *testing.T) {
 
 		fmt.Println("read thread")
 		var closed atomic.Bool
-		for {
-			if closed.Load() {
-				break
-			}
+		for !closed.Load() {
 			rdata := make([]byte, 128)
 			c, err := reader.Read(rdata)
 			if err == io.EOF {
