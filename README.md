@@ -235,35 +235,6 @@ The exception codes follow the Modbus Application Protocol Specification V1.1b3:
 `Acknowledge` (5), `ServerDeviceBusy` (6), `NegativeAcknowledge` (7), `MemoryParityError` (8),
 `GatewayPathUnavailable` (10), `GatewayTargetDeviceFailedToRespond` (11).
 
-## Upgrading from v0.2.x
-
-v0.3.0 names the Modbus address after the specification, the unit identifier, instead of
-"device":
-
-| v0.2.x                                     | v0.3.0                                     |
-|--------------------------------------------|--------------------------------------------|
-| `NewDevice(id)` / `RemoveDevice(id)`       | `NewUnit(id)` / `RemoveUnit(id)`           |
-| `type Device`                              | `type Unit`                                |
-| `Framer.GetDevice()` / `SetDevice(id)`     | `Framer.GetUnitId()` / `SetUnitId(id)`     |
-| `TCPFrame.Device`, `RTUFrame.Address`      | `TCPFrame.UnitId`, `RTUFrame.UnitId`       |
-| log key `device`                           | log key `unitId`                           |
-
-New: `SetBroadcast`. Fixed: FC5 and FC6 with too few data bytes panicked and stopped the process;
-they are now answered with `IllegalDataValue`, and a panicking handler no longer stops the server.
-
-## Upgrading from v0.0.x
-
-v0.1.0 changes the API:
-
-| v0.0.x                                  | v0.1.0                                                       |
-|-----------------------------------------|--------------------------------------------------------------|
-| `NewServer()`                           | `NewServer(logger)`, then `Start(ctx)`                       |
-| `ListenTCP(address)`                    | `ListenTCP(ctx, address)`                                    |
-| `ListenRTU(port io.ReadWriteCloser)`    | `ListenRTU(ctx, name, SerialConfig)` — the server opens the port |
-| `s.Devices[id].HoldingRegisters[i] = v` | `SetHoldingRegisters` / `UpdateHoldingRegisters`             |
-| `SlaveDeviceFailure`, `SlaveDeviceBusy`, `AcknowledgeSlave` | `ServerDeviceFailure`, `ServerDeviceBusy`, `Acknowledge` |
-| `SetDebug(...)`                         | pass a `*slog.Logger` to `NewServer`                         |
-
 ## Development
 
 ```sh
