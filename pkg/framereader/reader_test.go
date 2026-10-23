@@ -200,7 +200,9 @@ func TestResponseReaderSerialPortClose(t *testing.T) {
 
 func TestReader(t *testing.T) {
 	source := &dataSource{}
-	reader := NewReader(source, time.Second, time.Millisecond*10)
+	// The source sends a byte every 5 ms. The inter-frame delay leaves room for a sleep that
+	// overruns under the race detector; at 10 ms the frame split now and then.
+	reader := NewReader(source, time.Second, time.Millisecond*50)
 
 	start := time.Now()
 	data := make([]byte, 100)
@@ -212,8 +214,9 @@ func TestReader(t *testing.T) {
 		t.Error("read failed: ", err)
 	}
 
-	if dur < 100*time.Millisecond || dur > 200*time.Millisecond {
-		t.Error("expected dur to be around 150ms: ", dur)
+	// 100 ms before the first byte, 9 × 5 ms for the rest, 50 ms of silence
+	if dur < 150*time.Millisecond || dur > 400*time.Millisecond {
+		t.Error("expected dur to be around 200ms: ", dur)
 	}
 
 	if count != 10 {
