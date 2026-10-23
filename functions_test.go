@@ -339,3 +339,62 @@ func TestOutOfBounds(t *testing.T) {
 		t.Errorf("expected IllegalDataAddress, got %v", exception.String())
 	}
 }
+
+// writeRequest builds a request for unit 1 with address 0, quantity, and - for the write
+// functions 15 and 16 - the byte count and data that match the quantity.
+func writeRequest(function uint8, quantity int) *TCPFrame {
+	data := []byte{0, 0, byte(quantity >> 8), byte(quantity)}
+	switch function {
+	case 15:
+		n := (quantity + 7) / 8
+		data = append(append(data, byte(n)), make([]byte, n)...)
+	case 16:
+		n := 2 * quantity
+		data = append(append(data, byte(n)), make([]byte, n)...)
+	}
+	frame := &TCPFrame{TransactionIdentifier: 1, UnitId: 1, Function: function}
+	frame.SetData(data)
+	return frame
+}
+
+// TestQuantityLimits: every function code accepts its maximum quantity and answers 0 and
+// maximum+1 with IllegalDataValue, as the specification fixes them.
+func TestQuantityLimits(t *testing.T) {
+	s := NewServer(quietLogger())
+	for _, tc := range []struct {
+		function uint8
+		max      int
+	}{{1, 2000}, {2, 2000}, {3, 125}, {4, 125}, {15, 1968}, {16, 123}} {
+		for quantity, want := range map[int]Exception{0: IllegalDataValue, tc.max: Success, tc.max + 1: IllegalDataValue} {
+			response := s.handle(Request{frame: writeRequest(tc.function, quantity)})
+			if got := GetException(response); got != want {
+				t.Errorf("function %d, quantity %d: got %v, want %v", tc.function, quantity, got, want)
+			}
+		}
+	}
+}
+
+// TestWriteByteCountMismatch: FC15 and FC16 answer a byte count field or a data length that
+// does not match the quantity with IllegalDataValue and write nothing.
+func TestWriteByteCountMismatch(t *testing.T) {
+	for name, tc := range map[string]struct {
+		function uint8
+		data     []byte // address 0x0001, quantity 2, byte count, values
+	}{
+		"FC15 byte count too large":   {15, []byte{0, 1, 0, 2, 2, 0xFF, 0xFF}},
+		"FC15 more data than counted": {15, []byte{0, 1, 0, 2, 1, 0xFF, 0xFF}},
+		"FC16 byte count too small":   {16, []byte{0, 1, 0, 2, 3, 0, 7, 0, 7}},
+		"FC16 odd data length":        {16, []byte{0, 1, 0, 2, 4, 0, 7, 0}},
+	} {
+		s := NewServer(quietLogger())
+		frame := &TCPFrame{TransactionIdentifier: 1, UnitId: 1, Function: tc.function}
+		frame.SetData(tc.data)
+		response := s.handle(Request{frame: frame})
+		if got := GetException(response); got != IllegalDataValue {
+			t.Errorf("%s: got %v, want IllegalDataValue", name, got)
+		}
+		if s.units[1].Coils[1] != 0 || s.units[1].HoldingRegisters[1] != 0 {
+			t.Errorf("%s: a rejected request was written", name)
+		}
+	}
+}

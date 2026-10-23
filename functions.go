@@ -193,8 +193,9 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, Exception) {
 	}
 	valueBytes := data[5:]
 
+	// the byte count field and the data that follows must both match the quantity
 	expectedBytes := (numRegs + 7) / 8
-	if len(valueBytes) < expectedBytes {
+	if int(data[4]) != expectedBytes || len(valueBytes) != expectedBytes {
 		return []byte{}, IllegalDataValue
 	}
 
@@ -242,9 +243,9 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, Exception) {
 	}
 	valueBytes := data[5:]
 
-	if len(valueBytes)/2 != numRegs {
-		s.log.Error("WriteHoldingRegisters", "unitId", unitId, "register", register, "quantity", numRegs, "valueBytesLength", len(valueBytes), "exception", "IllegalDataAddress")
-		return []byte{}, IllegalDataAddress
+	// the byte count field and the data that follows must both match the quantity
+	if int(data[4]) != 2*numRegs || len(valueBytes) != 2*numRegs {
+		return []byte{}, IllegalDataValue
 	}
 
 	// Copy data to memory
@@ -254,10 +255,7 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, Exception) {
 	if _, ok := s.units[unitId]; !ok {
 		return []byte{}, IllegalDataAddress
 	}
-	if valuesUpdated := copy(s.units[unitId].HoldingRegisters[register:], values); valuesUpdated != numRegs {
-		s.log.Error("WriteHoldingRegisters", "unitId", unitId, "register", register, "quantity", numRegs, "valuesUpdated", valuesUpdated, "exception", "IllegalDataAddress")
-		return []byte{}, IllegalDataAddress
-	}
+	copy(s.units[unitId].HoldingRegisters[register:], values) // endRegister <= 65536: all fit
 
 	r := frame.GetData()[0:4]
 	s.log.Debug("WriteHoldingRegisters response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hex.EncodeToString(r))
