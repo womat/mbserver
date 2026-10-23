@@ -92,6 +92,55 @@ func TestCloseWithConnectedTCPClient(t *testing.T) {
 	}
 }
 
+// TestNonReadingClientDoesNotStallOthers: a TCP client that sends requests but never reads the
+// responses must not block the shared handler, and with it every other client.
+func TestNonReadingClientDoesNotStallOthers(t *testing.T) {
+	s := NewServer(quietLogger())
+	s.writeTimeout = 100 * time.Millisecond // set before Start, the handler reads it
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	address := l.Addr().String()
+	_ = l.Close()
+	if err = s.ListenTCP(context.Background(), address); err != nil {
+		t.Fatal(err)
+	}
+
+	// 125 registers: a 12-byte request draws a 259-byte response, which fills the socket
+	// buffers of a client that does not read within a fraction of a second.
+	request := TCPFrame{TransactionIdentifier: 1, UnitId: 1, Function: 3}
+	SetRegisterValues(&request, 0, 125, []uint16{})
+	flood := request.Bytes()
+
+	bad, err := net.Dial("tcp", address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer bad.Close()
+	_ = bad.(*net.TCPConn).SetReadBuffer(1024)
+	go func() {
+		for {
+			if _, err := bad.Write(flood); err != nil {
+				return // disconnected by the server
+			}
+		}
+	}()
+	time.Sleep(time.Second)
+
+	good, err := net.Dial("tcp", address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer good.Close()
+	readRegister(t, good, 1)
+}
+
 func TestHoldingRegisterAPI(t *testing.T) {
 	s := NewServer(quietLogger())
 	if err := s.NewUnit(200); err != nil {

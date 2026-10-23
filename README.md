@@ -225,6 +225,8 @@ be opened at all, so a wrong device name shows up at start.
   20–40 ms.
 - **Read timeout** (`SerialConfig.Timeout`, 5 s by default): only bounds a single read; a client
   that is silent for longer is still answered afterwards.
+- **Write timeout**: a TCP client that does not take its response within 5 s is disconnected,
+  so a client that sends but never reads cannot stall the requests of everyone else.
 - **`Close`** disconnects TCP clients, so after a restart nobody keeps being served by the old
   instance. It may be called more than once.
 

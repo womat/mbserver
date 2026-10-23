@@ -21,6 +21,11 @@ var (
 const (
 	// defaultMaxConnections limits concurrent clients to prevent resource exhaustion.
 	defaultMaxConnections = 100
+
+	// defaultWriteTimeout bounds writing a response to a TCP client. All requests share one
+	// handler goroutine, so a client that sends but does not read would otherwise stall every
+	// other client and serial port once its socket buffer is full.
+	defaultWriteTimeout = 5 * time.Second
 )
 
 // Server is a Modbus server with allocated memory for discrete inputs, coils, etc. per unit ID.
@@ -32,6 +37,7 @@ type Server struct {
 	serialPorts    []*serialPort
 	openSerial     func(port string, config SerialConfig) (io.ReadWriteCloser, error)
 	reopenInterval time.Duration
+	writeTimeout   time.Duration
 	function       [256]func(*Server, Framer) ([]byte, Exception)
 	units          map[byte]Unit
 	offline        map[byte]bool // unit IDs that keep their registers but do not answer, see SetOnline
@@ -86,6 +92,7 @@ func NewServer(log *slog.Logger) *Server {
 
 		openSerial:     openSerialPort,
 		reopenInterval: defaultReopenInterval,
+		writeTimeout:   defaultWriteTimeout,
 
 		clients: map[io.ReadWriteCloser]*Client{},
 	}
@@ -374,7 +381,7 @@ func (s *Server) handler(ctx context.Context) {
 			}
 
 			response := s.handle(request) // the handlers take the lock themselves
-			if _, err := request.conn.Write(response.Bytes()); err != nil {
+			if err := s.write(request, response); err != nil {
 				s.log.Warn("failed to write response", "error", err)
 				continue
 			}
@@ -397,9 +404,23 @@ func (s *Server) reject(request Request, isTCP bool) {
 	}
 	response := request.frame.Copy()
 	response.SetException(GatewayTargetDeviceFailedToRespond)
-	if _, err := request.conn.Write(response.Bytes()); err != nil {
+	if err := s.write(request, response); err != nil {
 		s.log.Warn("failed to write response", "error", err)
 	}
+}
+
+// write sends response to the client of request. A TCP client gets writeTimeout to take it;
+// one that does not is disconnected, as a partly written response breaks the stream anyway.
+func (s *Server) write(request Request, response Framer) error {
+	conn, isTCP := request.conn.(net.Conn)
+	if isTCP {
+		_ = conn.SetWriteDeadline(time.Now().Add(s.writeTimeout))
+	}
+	_, err := request.conn.Write(response.Bytes())
+	if err != nil && isTCP {
+		_ = conn.Close()
+	}
+	return err
 }
 
 // Close stops the server: cancels the handler, closes all listeners, client connections and
