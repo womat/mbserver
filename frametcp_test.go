@@ -49,3 +49,21 @@ func TestTCPFrameBytes(t *testing.T) {
 		t.Errorf("expected %v, got %v", expect, got)
 	}
 }
+
+// TestNewTCPFrameRejects: a packet with a protocol identifier other than 0 or a length field
+// that does not match the data is no Modbus TCP frame. The server reads exactly the bytes the
+// length field announces, so the length check is reached only by calling NewTCPFrame directly.
+func TestNewTCPFrameRejects(t *testing.T) {
+	for name, packet := range map[string][]byte{
+		"protocol identifier 1":  {0, 1, 0, 1, 0, 6, 1, 3, 0, 0, 0, 1},
+		"length field too large": {0, 1, 0, 0, 0, 7, 1, 3, 0, 0, 0, 1},
+		"length field too small": {0, 1, 0, 0, 0, 5, 1, 3, 0, 0, 0, 1},
+	} {
+		if _, err := NewTCPFrame(packet); err == nil {
+			t.Errorf("%s: NewTCPFrame accepted % x", name, packet)
+		}
+	}
+	if _, err := NewTCPFrame([]byte{0, 1, 0, 0, 0, 6, 1, 3, 0, 0, 0, 1}); err != nil {
+		t.Errorf("valid frame rejected: %v", err)
+	}
+}
