@@ -104,9 +104,7 @@ func (r *Reader) Flush() (int, error) {
 			}
 
 			n += len(newData)
-			if !timeout.Stop() {
-				<-timeout.C
-			}
+			stopTimer(timeout)
 			timeout.Reset(r.interFrameDelay)
 
 		case <-r.stop:
