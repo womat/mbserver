@@ -256,12 +256,15 @@ type Stats struct {
 
 // Stats returns the request counters and the number of connected TCP clients. Requests for
 // unknown or offline unit IDs and broadcasts are not counted. A client polls the counters and
-// takes the difference to show activity.
+// takes the difference to show activity. TCPClients counts the same connections as Clients.
 func (s *Server) Stats() Stats {
+	s.clientsMu.Lock()
+	clients := len(s.clients)
+	s.clientsMu.Unlock()
 	return Stats{
 		TCPRequests: s.tcpRequests.Load(),
 		RTURequests: s.rtuRequests.Load(),
-		TCPClients:  len(s.connSemaphore),
+		TCPClients:  clients,
 	}
 }
 

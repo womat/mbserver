@@ -80,9 +80,9 @@ func (s *Server) acceptTCP(ctx context.Context, listen net.Listener) {
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	s.addClient(conn)
 	defer func() {
-		s.removeClient(conn)
 		_ = conn.Close()
-		<-s.connSemaphore // release the slot
+		<-s.connSemaphore // release the slot before Stats stops counting the client
+		s.removeClient(conn)
 		s.wg.Done()
 	}()
 
