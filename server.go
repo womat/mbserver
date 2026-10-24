@@ -326,8 +326,14 @@ func (s *Server) handle(request Request) (response Framer) {
 		}
 	}()
 
-	if s.function[function] != nil {
-		data, exception = s.function[function](s, request.frame)
+	// read under the lock, as RegisterFunctionHandler may run meanwhile; call without it, as
+	// the handlers take it themselves
+	s.mu.RLock()
+	handler := s.function[function]
+	s.mu.RUnlock()
+
+	if handler != nil {
+		data, exception = handler(s, request.frame)
 		response.SetData(data)
 	} else {
 		s.log.Debug("illegal function", "function", function)

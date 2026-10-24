@@ -135,3 +135,23 @@ func TestHandlerPanicIsRecovered(t *testing.T) {
 		t.Fatalf("server answered % x after the panic, want a normal read", pdu)
 	}
 }
+
+// TestRegisterFunctionHandlerWhileServing: replacing a handler while requests are processed is
+// no data race. Run with -race.
+func TestRegisterFunctionHandlerWhileServing(t *testing.T) {
+	s := NewServer(quietLogger())
+	echo := func(_ *Server, frame Framer) ([]byte, Exception) { return frame.GetData(), Success }
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range 1000 {
+			s.RegisterFunctionHandler(100, echo)
+		}
+	}()
+	frame := &TCPFrame{TransactionIdentifier: 1, UnitId: 1, Function: 100}
+	for range 1000 {
+		_ = s.handle(Request{frame: frame})
+	}
+	<-done
+}
