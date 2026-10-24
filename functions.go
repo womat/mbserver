@@ -3,6 +3,7 @@ package mbserver
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"log/slog"
 )
 
 // ReadCoils function 1, reads coils from internal memory.
@@ -14,7 +15,7 @@ func ReadCoils(s *Server, frame Framer) ([]byte, Exception) {
 		return []byte{}, IllegalDataValue
 	}
 	if endRegister > 65536 {
-		s.log.Error("ReadCoils", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
+		s.log.Debug("ReadCoils", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
 
@@ -38,7 +39,7 @@ func ReadCoils(s *Server, frame Framer) ([]byte, Exception) {
 		}
 	}
 
-	s.log.Debug("ReadCoils response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hex.EncodeToString(data))
+	s.log.Debug("ReadCoils response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hexBytes(data))
 	return data, Success
 }
 
@@ -51,7 +52,7 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, Exception) {
 		return []byte{}, IllegalDataValue
 	}
 	if endRegister > 65536 {
-		s.log.Error("ReadDiscreteInputs", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
+		s.log.Debug("ReadDiscreteInputs", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
 
@@ -74,7 +75,7 @@ func ReadDiscreteInputs(s *Server, frame Framer) ([]byte, Exception) {
 		}
 	}
 
-	s.log.Debug("ReadDiscreteInputs response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hex.EncodeToString(data))
+	s.log.Debug("ReadDiscreteInputs response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hexBytes(data))
 	return data, Success
 }
 
@@ -87,7 +88,7 @@ func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, Exception) {
 		return []byte{}, IllegalDataValue
 	}
 	if endRegister > 65536 {
-		s.log.Error("ReadHoldingRegisters", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
+		s.log.Debug("ReadHoldingRegisters", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
 
@@ -98,7 +99,7 @@ func ReadHoldingRegisters(s *Server, frame Framer) ([]byte, Exception) {
 		return []byte{}, IllegalDataAddress
 	}
 	r := append([]byte{byte(numRegs * 2)}, Uint16ToBytes(dev.HoldingRegisters[register:endRegister])...)
-	s.log.Debug("ReadHoldingRegisters response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hex.EncodeToString(r))
+	s.log.Debug("ReadHoldingRegisters response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hexBytes(r))
 	return r, Success
 }
 
@@ -111,7 +112,7 @@ func ReadInputRegisters(s *Server, frame Framer) ([]byte, Exception) {
 		return []byte{}, IllegalDataValue
 	}
 	if endRegister > 65536 {
-		s.log.Error("ReadInputRegisters", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
+		s.log.Debug("ReadInputRegisters", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
 
@@ -122,7 +123,7 @@ func ReadInputRegisters(s *Server, frame Framer) ([]byte, Exception) {
 		return []byte{}, IllegalDataAddress
 	}
 	r := append([]byte{byte(numRegs * 2)}, Uint16ToBytes(dev.InputRegisters[register:endRegister])...)
-	s.log.Debug("ReadInputRegisters response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hex.EncodeToString(r))
+	s.log.Debug("ReadInputRegisters response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hexBytes(r))
 	return r, Success
 }
 
@@ -170,7 +171,7 @@ func WriteHoldingRegister(s *Server, frame Framer) ([]byte, Exception) {
 	}
 	s.units[unitId].HoldingRegisters[register] = value
 	r := frame.GetData()[0:4]
-	s.log.Debug("WriteHoldingRegister response", "unitId", unitId, "register", register, "value", value, "response", hex.EncodeToString(r))
+	s.log.Debug("WriteHoldingRegister response", "unitId", unitId, "register", register, "value", value, "response", hexBytes(r))
 	return r, Success
 }
 
@@ -183,7 +184,7 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, Exception) {
 		return []byte{}, IllegalDataValue
 	}
 	if endRegister > 65536 {
-		s.log.Error("WriteMultipleCoils", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
+		s.log.Debug("WriteMultipleCoils", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
 
@@ -220,7 +221,7 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, Exception) {
 	}
 
 	r := frame.GetData()[0:4]
-	s.log.Debug("WriteMultipleCoils response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hex.EncodeToString(r))
+	s.log.Debug("WriteMultipleCoils response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hexBytes(r))
 	return r, Success
 }
 
@@ -233,7 +234,7 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, Exception) {
 		return []byte{}, IllegalDataValue
 	}
 	if endRegister > 65536 {
-		s.log.Error("WriteHoldingRegisters", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
+		s.log.Debug("WriteHoldingRegisters", "unitId", unitId, "register", register, "quantity", numRegs, "endRegister", endRegister, "exception", "IllegalDataAddress")
 		return []byte{}, IllegalDataAddress
 	}
 
@@ -258,7 +259,7 @@ func WriteHoldingRegisters(s *Server, frame Framer) ([]byte, Exception) {
 	copy(s.units[unitId].HoldingRegisters[register:], values) // endRegister <= 65536: all fit
 
 	r := frame.GetData()[0:4]
-	s.log.Debug("WriteHoldingRegisters response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hex.EncodeToString(r))
+	s.log.Debug("WriteHoldingRegisters response", "unitId", unitId, "register", register, "quantity", numRegs, "response", hexBytes(r))
 	return r, Success
 }
 
@@ -285,3 +286,9 @@ func Uint16ToBytes(values []uint16) []byte {
 func bitAtPosition(value uint8, pos uint) uint8 {
 	return (value >> pos) & 0x01
 }
+
+// hexBytes logs as hex. slog resolves it only when the record is written, so a request costs
+// no encoding while debug logging is off.
+type hexBytes []byte
+
+func (b hexBytes) LogValue() slog.Value { return slog.StringValue(hex.EncodeToString(b)) }
