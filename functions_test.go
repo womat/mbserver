@@ -174,6 +174,18 @@ func TestWriteSingleCoil(t *testing.T) {
 	if !isEqual(expect, got) {
 		t.Errorf("expected %v, got %v\n", expect, got)
 	}
+
+	// 0x0000 switches the coil off again
+	SetRegisterData(&frame, 65535, 0x0000)
+	if exception = GetException(s.handle(req)); exception != Success || s.units[1].Coils[65535] != 0 {
+		t.Errorf("0x0000: got %v and coil %d, want Success and 0", exception, s.units[1].Coils[65535])
+	}
+
+	// any other value is no coil state and leaves the coil as it is
+	SetRegisterData(&frame, 65535, 0x0001)
+	if exception = GetException(s.handle(req)); exception != IllegalDataValue || s.units[1].Coils[65535] != 0 {
+		t.Errorf("0x0001: got %v and coil %d, want IllegalDataValue and 0", exception, s.units[1].Coils[65535])
+	}
 }
 
 // Function 6

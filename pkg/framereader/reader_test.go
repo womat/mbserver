@@ -385,3 +385,38 @@ func TestClose(t *testing.T) {
 	rc.Close()
 	time.Sleep(4 * time.Second)
 }
+
+// endingSource returns its data together with io.EOF, as a reader at its end may.
+type endingSource struct {
+	data []byte
+	done bool
+}
+
+func (s *endingSource) Read(p []byte) (int, error) {
+	if s.done {
+		return 0, io.EOF
+	}
+	s.done = true
+	return copy(p, s.data), io.EOF
+}
+
+// TestFrameBeforeEndIsDelivered: bytes that arrive with the end of the source are delivered
+// as the last frame at once - not lost, and without waiting for the inter-frame delay - and
+// the next Read reports io.EOF.
+func TestFrameBeforeEndIsDelivered(t *testing.T) {
+	reader := NewReader(&endingSource{data: []byte{1, 2, 3}}, 2*time.Second, time.Second)
+	defer reader.Close()
+
+	start := time.Now()
+	data := make([]byte, 16)
+	n, err := reader.Read(data)
+	if err != nil || !reflect.DeepEqual(data[:n], []byte{1, 2, 3}) {
+		t.Fatalf("got % x and %v, want 01 02 03 and no error", data[:n], err)
+	}
+	if dur := time.Since(start); dur > 500*time.Millisecond {
+		t.Errorf("the last frame took %v, want it without the inter-frame delay of 1s", dur)
+	}
+	if _, err = reader.Read(data); !errors.Is(err, io.EOF) {
+		t.Errorf("after the last frame got %v, want io.EOF", err)
+	}
+}
