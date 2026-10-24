@@ -6,7 +6,6 @@ import (
 )
 
 // ReadCloser is a convenience type that implements io.ReadCloser.
-// Write calls flush reader before writing the prompt.
 type ReadCloser struct {
 	reader *Reader
 	close  func() error
@@ -17,9 +16,8 @@ type ReadCloser struct {
 // timeout is used to specify an
 // overall timeout. If this timeout is encountered, ErrTimeout is returned.
 //
-// chunkTimeout is used to specify the max timeout between chunks of data once
-// the response is started. If a delay of chunkTimeout is encountered, the response
-// is considered finished and the Read returns.
+// interFrameDelay is the silence that ends a frame: once data has started, a gap of
+// interFrameDelay without new bytes completes the frame and Read returns it.
 func NewReadCloser(iorw io.ReadCloser, timeout time.Duration, interFrameDelay time.Duration) *ReadCloser {
 	return &ReadCloser{
 		close:  iorw.Close,
@@ -27,7 +25,7 @@ func NewReadCloser(iorw io.ReadCloser, timeout time.Duration, interFrameDelay ti
 	}
 }
 
-// Read response using chunkTimeout and timeout
+// Read returns the next frame, see Reader.Read.
 func (rc *ReadCloser) Read(buffer []byte) (int, error) {
 	return rc.reader.Read(buffer)
 }

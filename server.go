@@ -15,6 +15,7 @@ import (
 )
 
 var (
+	// ErrAlreadyStarted is returned by Start when the server has been started before.
 	ErrAlreadyStarted = errors.New("server already started")
 )
 
@@ -116,6 +117,8 @@ func NewServer(log *slog.Logger) *Server {
 	return s
 }
 
+// Start starts processing requests until ctx is done or Close is called. Call it once, before
+// ListenTCP and ListenRTU; register custom function handlers before it as well.
 func (s *Server) Start(ctx context.Context) error {
 	err := ErrAlreadyStarted
 	s.startOnce.Do(func() {
@@ -130,6 +133,8 @@ func (s *Server) Start(ctx context.Context) error {
 	return err
 }
 
+// NewUnit adds unit ID id (1-247) with 65536 zeroed coils, discrete inputs, holding and
+// input registers. It fails if the unit ID exists already.
 func (s *Server) NewUnit(id byte) error {
 	if id < idMin || id > idMax {
 		return fmt.Errorf("invalid modbus id %v", id)
@@ -151,6 +156,8 @@ func (s *Server) NewUnit(id byte) error {
 	return nil
 }
 
+// RemoveUnit removes unit ID id with its registers; requests for it are then answered like
+// those for any unknown unit ID. It fails if the unit ID does not exist.
 func (s *Server) RemoveUnit(id byte) error {
 	if id < idMin || id > idMax {
 		return fmt.Errorf("invalid modbus id %v", id)

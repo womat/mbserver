@@ -113,11 +113,9 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 		}
 
 		// --- 2. Decode the MBAP header ---
-		// The Length field covers Unit ID (1 byte) + PDU (n bytes).
-		// txnId := binary.BigEndian.Uint16(header[0:2])
-		// protocolId := binary.BigEndian.Uint16(header[2:4])
+		// The Length field covers Unit ID (1 byte) + PDU (n bytes). The other fields are
+		// parsed and checked by NewTCPFrame.
 		length := binary.BigEndian.Uint16(header[4:6])
-		// unitId := header[6]
 
 		if length < 1 {
 			s.log.Warn("Invalid MBAP length", "remote", remote, "length", length)

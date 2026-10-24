@@ -17,9 +17,8 @@ type ReadWriteCloser struct {
 // timeout is used to specify an
 // overall timeout. If this timeout is encountered, ErrTimeout is returned.
 //
-// chunkTimeout is used to specify the max timeout between chunks of data once
-// the response is started. If a delay of chunkTimeout is encountered, the response
-// is considered finished and the Read returns.
+// interFrameDelay is the silence that ends a frame: once data has started, a gap of
+// interFrameDelay without new bytes completes the frame and Read returns it.
 func NewReadWriteCloser(iorw io.ReadWriteCloser, timeout time.Duration, interFrameDelay time.Duration) *ReadWriteCloser {
 	return &ReadWriteCloser{
 		write:  iorw.Write,
@@ -27,7 +26,7 @@ func NewReadWriteCloser(iorw io.ReadWriteCloser, timeout time.Duration, interFra
 	}
 }
 
-// Read response using interframedelay and timeout
+// Read returns the next frame, see Reader.Read.
 func (rwc *ReadWriteCloser) Read(buffer []byte) (int, error) {
 	return rwc.reader.Read(buffer)
 }

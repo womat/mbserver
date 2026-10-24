@@ -79,8 +79,7 @@ func (frame *RTUFrame) GetData() []byte {
 	return frame.Data
 }
 
-// SetData sets the RTUFrame Data byte field and updates the frame length
-// accordingly.
+// SetData sets the RTUFrame Data byte field; the CRC is computed by Bytes.
 func (frame *RTUFrame) SetData(data []byte) {
 	frame.Data = data
 }

@@ -246,8 +246,9 @@ go test -race ./...
 go test -bench=.      # TCP read/write benchmarks
 ```
 
-`TestSerialHW` runs against a real adapter on `/dev/ttyUSB0` and is skipped without one; all
-other tests use in-memory pipes and local TCP ports.
+`TestSerialHW` runs against a real adapter on `/dev/ttyUSB0` and is skipped without one.
+`TestModbusRTU` serves RTU over a pair of virtual serial ports and runs only on Linux with
+`socat` installed, as in CI. All other tests use in-memory pipes and local TCP ports.
 
 ## License
 

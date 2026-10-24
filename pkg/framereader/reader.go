@@ -39,9 +39,8 @@ var ErrTimeout = errors.New("framereader: timeout")
 // overall timeout. If this timeout is encountered, ErrTimeout is returned.
 // io.EOF is returned once the reader is closed or the source stopped.
 //
-// chunkTimeout is used to specify the max timeout between chunks of data once
-// the response is started. If a delay of chunkTimeout is encountered, the response
-// is considered finished and the Read returns.
+// interFrameDelay is the silence that ends a frame: once data has started, a gap of
+// interFrameDelay without new bytes completes the frame and Read returns it.
 func NewReader(ioReader io.Reader, timeout time.Duration, interFrameDelay time.Duration) *Reader {
 	r := Reader{
 		ioRead:          ioReader.Read,
