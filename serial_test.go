@@ -157,6 +157,26 @@ func TestCloseStopsReopening(t *testing.T) {
 	}
 }
 
+// TestListenRTUAfterClose: a closed server does not keep a serial port open; ListenRTU
+// reports the error and the port is closed again.
+func TestListenRTUAfterClose(t *testing.T) {
+	f := newFakeSerial()
+	s := newSerialTestServer(t, f)
+	s.Close()
+
+	if err := s.ListenRTU(context.Background(), "/dev/ttyFAKE", SerialConfig{}); err == nil {
+		t.Error("ListenRTU succeeded on a closed server")
+	}
+	if st := s.SerialStatus(); len(st) != 0 {
+		t.Errorf("SerialStatus() = %+v, want no port", st)
+	}
+	client := <-f.clients
+	_ = client.SetReadDeadline(time.Now().Add(time.Second))
+	if _, err := client.Read(make([]byte, 1)); !errors.Is(err, io.EOF) {
+		t.Errorf("reading the other end got %v, want io.EOF: the port is still open", err)
+	}
+}
+
 // TestRTUUnknownUnitIsSilent: on a serial bus another device may own the unit ID.
 func TestRTUUnknownUnitIsSilent(t *testing.T) {
 	f := newFakeSerial()

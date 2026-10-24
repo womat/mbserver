@@ -158,14 +158,13 @@ func (s *Server) ListenRTU(ctx context.Context, port string, config SerialConfig
 	if err != nil {
 		return err
 	}
-	s.serveSerial(ctx, port, rwc, func() (io.ReadWriteCloser, error) { return s.openSerial(port, config) })
-	return nil
+	return s.serveSerial(ctx, port, rwc, func() (io.ReadWriteCloser, error) { return s.openSerial(port, config) })
 }
 
 // listenRTUFromReadWriter serves RTU frames from an existing io.ReadWriteCloser, without
 // reopening it after a failure. Used for testing.
 func (s *Server) listenRTUFromReadWriter(ctx context.Context, rwc io.ReadWriteCloser) {
-	s.serveSerial(ctx, "", rwc, nil)
+	_ = s.serveSerial(ctx, "", rwc, nil)
 }
 
 // SerialStatus returns the state of every serial port the server listens on.
@@ -183,16 +182,26 @@ func (s *Server) SerialStatus() []SerialStatus {
 }
 
 // serveSerial registers the port and serves it in a goroutine. reopen is nil for a port
-// that is not reopened after a failure.
-func (s *Server) serveSerial(ctx context.Context, name string, rwc io.ReadWriteCloser, reopen func() (io.ReadWriteCloser, error)) {
+// that is not reopened after a failure. If the server is already closed, it closes rwc and
+// returns an error.
+func (s *Server) serveSerial(ctx context.Context, name string, rwc io.ReadWriteCloser, reopen func() (io.ReadWriteCloser, error)) error {
 	p := &serialPort{status: SerialStatus{Port: name}}
 	p.connect(rwc)
 
+	// Under the lock Close holds while it closes the ports: either Close sees this port, or
+	// this sees that the server is closed. Adding to wg here keeps it ahead of Close's Wait.
 	s.mu.Lock()
+	select {
+	case <-s.done:
+		s.mu.Unlock()
+		_ = rwc.Close()
+		return errors.New("mbserver: server closed")
+	default:
+	}
 	s.serialPorts = append(s.serialPorts, p)
+	s.wg.Add(1)
 	s.mu.Unlock()
 
-	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
 		for {
@@ -211,6 +220,7 @@ func (s *Server) serveSerial(ctx context.Context, name string, rwc io.ReadWriteC
 			s.log.Info("Serial port reopened", "port", name)
 		}
 	}()
+	return nil
 }
 
 // reopenSerial tries to reopen the port every reopenInterval until it succeeds (true) or the
