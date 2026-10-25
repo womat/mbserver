@@ -1,9 +1,7 @@
-# Keeps the Go dependencies and the SHA-pinned GitHub Actions current.
+# All Go updates go into one group, so a week brings at most one pull request
+# for them.
 #
-# The workflows pin every action to a commit SHA with the release in a comment;
-# dependabot updates both together. golangci-lint and govulncheck are installed
-# with `go install` in the workflows, which dependabot does not see - raise
-# those pins by hand.
+# To switch this off, delete this file. The CI workflow does not depend on it.
 
 version: 2
 
@@ -14,19 +12,18 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     commit-message:
-      # Matches the "type() description" convention the release changelog groups on.
-      prefix: "chore()"
+      prefix: "chore(deps)"
     groups:
-      golang-x:
+      go:
         patterns:
-          - "golang.org/x/*"
+          - "*"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     commit-message:
-      prefix: "chore()"
+      prefix: "chore(ci)"
     groups:
       actions:
         patterns:

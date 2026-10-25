@@ -1,59 +1,121 @@
-# Vet, lint, test and scan on every push and pull request.
+# Continuous integration for github.com/womat/mbserver.
 #
-# Actions are pinned to a commit SHA, with the release it belongs to in a
-# comment; dependabot (.github/dependabot.yml) proposes updates.
-name: ci
+# Actions are pinned to a commit SHA, with the release in a comment: a tag like
+# @v7 can be moved to other code, a SHA cannot. dependabot (.github/dependabot.yml)
+# proposes updates for them.
+#
+# setup-go takes the version from go.mod but the newest patch of it (check-latest),
+# and the weekly run repeats govulncheck without a change here: an advisory against
+# the Go toolchain or a dependency appears between commits, and dependabot does not
+# report the toolchain.
+
+name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# A new push to the same ref supersedes a run still in flight.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  checks:
+    name: gofmt, vet, lint, vulnerabilities
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-          # the newest patch release, not the one cached on the runner: govulncheck
-          # flags a standard library fixed in a newer patch
           check-latest: true
-          cache: true
-
-      # TestModbusRTU serves RTU over a pair of virtual serial ports created by socat.
-      - name: Install socat
-        run: sudo apt-get install -y --no-install-recommends socat
-
-      - name: Vet
+      # Pinned rather than @latest: a new release of either tool would
+      # otherwise turn this job red without a change in this repository.
+      # dependabot does not see pins in a run step; bump these by hand.
+      - name: install tools
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt'd:" >&2
+            echo "$unformatted" >&2
+            exit 1
+          fi
+      # Reports a pending diff and fails instead of writing it. Goes red on its
+      # own when a future Go release adds a fixer; "go fix ./..." applies it.
+      - name: go fix
+        run: |
+          diff=$(go fix -diff ./...)
+          if [ -n "$diff" ]; then
+            echo "$diff" >&2
+            exit 1
+          fi
+      # Prints the diff and exits non-zero when go.mod or go.sum is not tidy;
+      # "go mod tidy" applies it.
+      - name: go mod tidy
+        run: go mod tidy -diff
+      - name: go vet
         run: go vet ./...
-
-      # The README promises macOS and Windows too; vet compiles for both without
-      # a runner of each.
-      - name: Vet macOS and Windows
+      # The cross job builds for macOS and Windows but compiles no _test.go file;
+      # vet does, so a test that only breaks there is caught too.
+      - name: go vet (macOS, Windows)
         run: |
           GOOS=darwin go vet ./...
           GOOS=windows go vet ./...
-
-      - name: Test with race detector
-        run: go test -race ./...
-
-      # golangci-lint with the default linters and the exclusions in
-      # .golangci.yml. Pinned like govulncheck; dependabot does not see it.
       - name: golangci-lint
-        run: |
-          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
-          "$(go env GOPATH)/bin/golangci-lint" run ./...
+        run: golangci-lint run ./...
+      - name: govulncheck
+        run: govulncheck ./...
 
-      # Pinned rather than @latest, so a new release cannot turn CI red without a
-      # change here. dependabot does not see go install lines - raise it by hand.
-      - name: Vulnerability scan
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
-          "$(go env GOPATH)/bin/govulncheck" ./...
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      # TestModbusRTU serves RTU over a pair of virtual serial ports created by socat.
+      - name: install socat
+        run: sudo apt-get install -y --no-install-recommends socat
+      - name: go test
+        run: go test -race -cover ./...
+
+  cross:
+    name: cross-compile (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: "Pi 1 / Zero", goos: linux, goarch: arm, goarm: "6" }
+          - { name: "Pi 2/3/4 32-bit", goos: linux, goarch: arm, goarm: "7" }
+          - { name: "Pi 3/4/5 64-bit", goos: linux, goarch: arm64 }
+          - { name: "linux 386", goos: linux, goarch: "386" }
+          - { name: "windows amd64", goos: windows, goarch: amd64 }
+          - { name: "macOS arm64", goos: darwin, goarch: arm64 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          check-latest: true
+      - name: go build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+        run: go build ./...
