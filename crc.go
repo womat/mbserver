@@ -40,10 +40,10 @@ var crcTable = func() [256]uint16 {
 	const crc16IBM = uint16(0xA001)
 	var table [256]uint16
 
-	for i := uint16(0); i < 256; i++ {
+	for i := range uint16(256) {
 		crc := uint16(0)
 		c := i
-		for j := uint16(0); j < 8; j++ {
+		for range uint16(8) {
 			if ((crc ^ c) & 0x0001) > 0 {
 				crc = (crc >> 1) ^ crc16IBM
 			} else {

@@ -16,8 +16,7 @@ func quietLogger() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard
 // TestRTUKeepsServingAfterIdle: an RTU client that is silent longer than the read timeout
 // (e.g. an inverter at night) must still get answers afterwards.
 func TestRTUKeepsServingAfterIdle(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	s := NewServer(quietLogger())
 	if err := s.Start(ctx); err != nil {
@@ -175,8 +174,7 @@ func TestHoldingRegisterAPI(t *testing.T) {
 // always carry the same counter, so a read mixing an old and a new word is detected.
 func TestNoTornReads(t *testing.T) {
 	s := NewServer(quietLogger())
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	if err := s.Start(ctx); err != nil {
 		t.Fatal(err)
 	}

@@ -208,7 +208,7 @@ func WriteMultipleCoils(s *Server, frame Framer) ([]byte, Exception) {
 
 	bitCount := 0
 	for i, value := range valueBytes {
-		for bitPos := uint(0); bitPos < 8; bitPos++ {
+		for bitPos := range uint(8) {
 			s.units[unitId].Coils[register+(i*8)+int(bitPos)] = bitAtPosition(value, bitPos)
 			bitCount++
 			if bitCount >= numRegs {

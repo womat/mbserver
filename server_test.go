@@ -1,7 +1,6 @@
 package mbserver
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -84,8 +83,7 @@ func TestUnsupportedFunction(t *testing.T) {
 }
 
 func TestModbus(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Server
 	s := NewServer(slog.Default())
@@ -189,8 +187,7 @@ func TestModbus(t *testing.T) {
 func TestInvalidUnitId(t *testing.T) {
 	const clients = 4
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Server
 	s := NewServer(slog.Default())
@@ -233,8 +230,7 @@ func TestBroadcastWrite(t *testing.T) {
 	const clients = 4
 	data := []byte{0, 3, 0, 4, 0, 5}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Server
 	s := NewServer(slog.Default())
@@ -290,8 +286,7 @@ func TestBroadcastWrite(t *testing.T) {
 func TestBroadcastRead(t *testing.T) {
 	const clients = 4
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Server
 	s := NewServer(slog.Default())

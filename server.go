@@ -124,11 +124,9 @@ func (s *Server) Start(ctx context.Context) error {
 	s.startOnce.Do(func() {
 		err = nil
 		ctx, s.cancel = context.WithCancel(ctx)
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
+		s.wg.Go(func() {
 			s.handler(ctx)
-		}()
+		})
 	})
 	return err
 }

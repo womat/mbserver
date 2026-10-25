@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func isEqual(a interface{}, b interface{}) bool {
+func isEqual(a any, b any) bool {
 	expect, _ := json.Marshal(a)
 	got, _ := json.Marshal(b)
 

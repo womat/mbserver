@@ -1,7 +1,6 @@
 package mbserver
 
 import (
-	"context"
 	"log/slog"
 	"testing"
 	"time"
@@ -19,8 +18,7 @@ func TestSerialHW(t *testing.T) {
 		t.Skip("hardware not available:", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	s := NewServer(slog.Default())
 	if err := s.Start(ctx); err != nil {

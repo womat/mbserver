@@ -3,7 +3,6 @@
 package mbserver
 
 import (
-	"context"
 	"log/slog"
 	"os"
 	"os/exec"
@@ -47,8 +46,7 @@ func TestModbusRTU(t *testing.T) {
 
 	// Server
 	s := NewServer(slog.Default())
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	if err := s.Start(ctx); err != nil {
 		t.Fatalf("failed to start server: %v", err)
